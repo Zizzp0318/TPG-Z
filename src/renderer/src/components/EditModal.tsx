@@ -160,13 +160,12 @@ export function EditModal({
           </div>
 
           {/* 提示词 */}
-          <div className="flex-1">
+          <div className="flex flex-1 flex-col">
             <label className="mb-1.5 block text-xs font-medium text-neutral-500">提示词</label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              rows={5}
-              className="w-full resize-none rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-indigo-500"
+              className="min-h-[120px] w-full flex-1 resize-none rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-indigo-500"
             />
           </div>
 

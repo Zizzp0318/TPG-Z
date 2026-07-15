@@ -104,7 +104,7 @@ export function ImportModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="flex h-[90vh] w-[780px] max-w-[95vw] flex-col rounded-xl border border-neutral-700 bg-neutral-900 shadow-2xl">
+      <div className="flex h-[90vh] w-[960px] max-w-[95vw] flex-col rounded-xl border border-neutral-700 bg-neutral-900 shadow-2xl">
         {/* 标题栏 */}
         <div className="flex items-center justify-between border-b border-neutral-800 px-5 py-4">
           <h2 className="text-sm font-semibold text-neutral-100">导入 AI 生成作品</h2>
@@ -115,7 +115,7 @@ export function ImportModal({
 
         <div className="flex flex-1 overflow-hidden">
           {/* 左：图片选择 */}
-          <div className="flex w-64 shrink-0 flex-col border-r border-neutral-800 p-4 gap-4">
+          <div className="flex w-96 shrink-0 flex-col border-r border-neutral-800 p-4 gap-4">
             {/* 主文件（图片 or 视频） */}
             <div>
               <p className="mb-2 text-xs font-medium text-neutral-500">
@@ -130,13 +130,13 @@ export function ImportModal({
                       muted
                       playsInline
                       preload="metadata"
-                      className="h-44 w-full rounded-lg object-cover ring-1 ring-neutral-700 bg-black"
+                      className="max-h-[55vh] w-full rounded-lg object-contain ring-1 ring-neutral-700 bg-black"
                     />
                   ) : (
                     <img
                       src={srcPreview}
                       alt="预览"
-                      className="h-44 w-full rounded-lg object-cover ring-1 ring-neutral-700"
+                      className="max-h-[55vh] w-full rounded-lg object-contain ring-1 ring-neutral-700 bg-black"
                     />
                   )}
                   <button
@@ -222,14 +222,13 @@ export function ImportModal({
             </div>
 
             {/* 提示词 */}
-            <div className="flex-1">
+            <div className="flex flex-1 flex-col">
               <label className="mb-1.5 block text-xs font-medium text-neutral-500">提示词</label>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="粘贴或输入生成这张图片时使用的提示词…"
-                rows={5}
-                className="w-full resize-none rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-indigo-500"
+                className="min-h-[120px] w-full flex-1 resize-none rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-indigo-500"
               />
             </div>
 
