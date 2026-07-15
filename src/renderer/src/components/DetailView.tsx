@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Copy, Check, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, Copy, Check, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { GeneratedImage } from '../types'
 import { StarRating } from './StarRating'
 
@@ -12,6 +12,10 @@ interface DetailViewProps {
   hasNext?: boolean
   /** 评分变更回调，会同步到数据库 */
   onRatingChange?: (id: string, rating: number) => void
+  /** 点击编辑按钮 */
+  onEdit?: () => void
+  /** 点击删除按钮 */
+  onDelete?: () => void
 }
 
 interface Transform {
@@ -27,7 +31,9 @@ export function DetailView({
   onNext,
   hasPrev,
   hasNext,
-  onRatingChange
+  onRatingChange,
+  onEdit,
+  onDelete
 }: DetailViewProps) {
   const [copied, setCopied] = useState(false)
   const [transform, setTransform] = useState<Transform>({ scale: 1, x: 0, y: 0 })
@@ -183,12 +189,33 @@ export function DetailView({
         {/* 标题栏 */}
         <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
           <h2 className="truncate text-sm font-semibold text-neutral-100">{image.title}</h2>
-          <button
-            onClick={onClose}
-            className="ml-2 shrink-0 rounded p-1 text-neutral-400 hover:bg-neutral-800 hover:text-white"
-          >
-            <X size={16} />
-          </button>
+          <div className="ml-2 flex shrink-0 items-center gap-0.5">
+            {onEdit && (
+              <button
+                onClick={onEdit}
+                className="rounded p-1.5 text-neutral-400 hover:bg-neutral-800 hover:text-white"
+                title="编辑"
+              >
+                <Pencil size={15} />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={onDelete}
+                className="rounded p-1.5 text-neutral-400 hover:bg-red-900/40 hover:text-red-400"
+                title="删除"
+              >
+                <Trash2 size={15} />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="rounded p-1.5 text-neutral-400 hover:bg-neutral-800 hover:text-white"
+              title="关闭"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5 text-sm">

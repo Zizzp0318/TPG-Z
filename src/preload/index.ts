@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ImportPayload, IpcResult, ImageRecord } from '../shared/api'
+import type { ImportPayload, UpdatePayload, IpcResult, ImageRecord } from '../shared/api'
 
 // 暴露给渲染进程的 API
 const api = {
@@ -10,6 +10,14 @@ const api = {
   /** 导入一张图片 */
   importImage: (payload: ImportPayload): Promise<IpcResult<ImageRecord>> =>
     ipcRenderer.invoke('images:import', payload),
+
+  /** 编辑图片信息 */
+  updateImage: (payload: UpdatePayload): Promise<IpcResult<ImageRecord>> =>
+    ipcRenderer.invoke('images:update', payload),
+
+  /** 删除图片 */
+  deleteImage: (id: string): Promise<IpcResult> =>
+    ipcRenderer.invoke('images:delete', id),
 
   /** 更新评分 */
   updateRating: (id: string, rating: number): Promise<IpcResult> =>

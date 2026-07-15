@@ -5,11 +5,11 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'path'
 import { app } from 'electron'
-import { mkdirSync, copyFileSync, existsSync } from 'fs'
+import { mkdirSync, copyFileSync, existsSync, rmSync } from 'fs'
 import { randomUUID } from 'crypto'
 import { nativeImage } from 'electron'
 import { writeFileSync } from 'fs'
-import type { ImageRecord, ImportPayload } from '../shared/api'
+import type { ImageRecord, ImportPayload, UpdatePayload } from '../shared/api'
 import { toLocalUrl } from '../shared/url'
 
 let db: DatabaseSync | null = null
@@ -179,13 +179,96 @@ export function dbUpdateRating(id: string, rating: number): void {
   getDb().prepare(`UPDATE images SET rating = ? WHERE id = ?`).run(rating, id)
 }
 
-export function dbUpdateTags(id: string, tags: string[]): void {
+/** 重设一张图片的标签（先清空再写入） */
+function setImageTags(id: string, tags: string[]): void {
   const d = getDb()
   d.prepare(`DELETE FROM image_tags WHERE image_id = ?`).run(id)
   for (const tagName of tags) {
-    d.prepare(`INSERT OR IGNORE INTO tags (name) VALUES (?)`).run(tagName)
-    const tag = d.prepare(`SELECT id FROM tags WHERE name = ?`).get(tagName) as { id: number }
+    const name = tagName.trim()
+    if (!name) continue
+    d.prepare(`INSERT OR IGNORE INTO tags (name) VALUES (?)`).run(name)
+    const tag = d.prepare(`SELECT id FROM tags WHERE name = ?`).get(name) as { id: number }
     d.prepare(`INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)`).run(id, tag.id)
+  }
+}
+
+export function dbUpdateTags(id: string, tags: string[]): void {
+  setImageTags(id, tags)
+}
+
+/** 编辑图片信息：标题/提示词/类型/文件夹/标签/参考图 */
+export function dbUpdateImage(payload: UpdatePayload): ImageRecord {
+  const d = getDb()
+  const { id } = payload
+
+  // 更新主表字段
+  d.prepare(
+    `UPDATE images SET title = ?, prompt = ?, type = ?, folder = ? WHERE id = ?`
+  ).run(payload.title || '未命名', payload.prompt, payload.type, payload.folder || '未分类', id)
+
+  // 标签
+  setImageTags(id, payload.tags)
+
+  // 参考图：删除不在保留列表内的旧参考图（含文件）
+  const existingRefs = d
+    .prepare(`SELECT id, filename FROM reference_images WHERE image_id = ?`)
+    .all(id) as Array<{ id: string; filename: string }>
+  for (const ref of existingRefs) {
+    if (!payload.keepRefIds.includes(ref.id)) {
+      safeUnlink(join(dataDir, 'refs', ref.filename))
+      d.prepare(`DELETE FROM reference_images WHERE id = ?`).run(ref.id)
+    }
+  }
+
+  // 当前最大排序值，新增参考图接在后面
+  const maxOrderRow = d
+    .prepare(`SELECT COALESCE(MAX(sort_order), -1) AS m FROM reference_images WHERE image_id = ?`)
+    .get(id) as { m: number }
+  let order = maxOrderRow.m + 1
+
+  for (const refPath of payload.newRefPaths) {
+    if (!existsSync(refPath)) continue
+    const refId = randomUUID()
+    const refExt = refPath.split('.').pop() ?? 'jpg'
+    const refFilename = `${refId}.${refExt}`
+    copyFileSync(refPath, join(dataDir, 'refs', refFilename))
+    d.prepare(`INSERT INTO reference_images (id, image_id, filename, sort_order) VALUES (?, ?, ?, ?)`)
+      .run(refId, id, refFilename, order++)
+  }
+
+  return rowToRecord(d.prepare(`SELECT * FROM images WHERE id = ?`).get(id) as Record<string, unknown>)
+}
+
+/** 删除一张图片：数据库记录 + 本地图片/缩略图/参考图文件 */
+export function dbDeleteImage(id: string): void {
+  const d = getDb()
+  const row = d.prepare(`SELECT filename, thumb_name FROM images WHERE id = ?`).get(id) as
+    | { filename: string; thumb_name: string }
+    | undefined
+  if (!row) return
+
+  // 先收集参考图文件名（外键 CASCADE 会删表记录，但文件要手动删）
+  const refs = d
+    .prepare(`SELECT filename FROM reference_images WHERE image_id = ?`)
+    .all(id) as Array<{ filename: string }>
+
+  // 删数据库记录（image_tags、reference_images 由 ON DELETE CASCADE 自动清理）
+  d.prepare(`DELETE FROM images WHERE id = ?`).run(id)
+
+  // 删本地文件
+  safeUnlink(join(dataDir, 'images', row.filename))
+  safeUnlink(join(dataDir, 'thumbs', row.thumb_name))
+  for (const ref of refs) {
+    safeUnlink(join(dataDir, 'refs', ref.filename))
+  }
+}
+
+/** 安全删除文件，不存在或失败时忽略 */
+function safeUnlink(filePath: string): void {
+  try {
+    rmSync(filePath, { force: true })
+  } catch {
+    // 忽略删除失败
   }
 }
 

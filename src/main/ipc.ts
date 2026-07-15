@@ -5,12 +5,14 @@ import { ipcMain, dialog } from 'electron'
 import {
   dbGetImages,
   dbImportImage,
+  dbUpdateImage,
+  dbDeleteImage,
   dbUpdateRating,
   dbUpdateTags,
   dbGetFolders,
   dbGetTags
 } from './db'
-import type { ImportPayload, IpcResult, ImageRecord } from '../shared/api'
+import type { ImportPayload, UpdatePayload, IpcResult, ImageRecord } from '../shared/api'
 
 export function registerIpcHandlers(): void {
   // ---------- 图片列表 ----------
@@ -27,6 +29,26 @@ export function registerIpcHandlers(): void {
     try {
       const record = dbImportImage(payload)
       return { ok: true, data: record }
+    } catch (e) {
+      return { ok: false, error: String(e) }
+    }
+  })
+
+  // ---------- 编辑 ----------
+  ipcMain.handle('images:update', (_e, payload: UpdatePayload): IpcResult<ImageRecord> => {
+    try {
+      const record = dbUpdateImage(payload)
+      return { ok: true, data: record }
+    } catch (e) {
+      return { ok: false, error: String(e) }
+    }
+  })
+
+  // ---------- 删除 ----------
+  ipcMain.handle('images:delete', (_e, id: string): IpcResult => {
+    try {
+      dbDeleteImage(id)
+      return { ok: true }
     } catch (e) {
       return { ok: false, error: String(e) }
     }

@@ -29,6 +29,20 @@ export interface ImportPayload {
   refPaths: string[]
 }
 
+/** 编辑一张已有图片的表单数据 */
+export interface UpdatePayload {
+  id: string
+  title: string
+  prompt: string
+  type: 'text2img' | 'img2img'
+  folder: string
+  tags: string[]
+  /** 保留的已有参考图 id 列表（不在此列表内的旧参考图会被删除） */
+  keepRefIds: string[]
+  /** 新增参考图的绝对路径列表 */
+  newRefPaths: string[]
+}
+
 /** IPC 通用返回包装 */
 export interface IpcResult<T = void> {
   ok: boolean

@@ -4,6 +4,8 @@ import { Sidebar } from './components/Sidebar'
 import { MasonryGrid } from './components/MasonryGrid'
 import { DetailView } from './components/DetailView'
 import { ImportModal } from './components/ImportModal'
+import { EditModal } from './components/EditModal'
+import { ConfirmDialog } from './components/ConfirmDialog'
 import type { ImageRecord } from '../../shared/api'
 import { GeneratedImage, ViewMode } from './types'
 
@@ -43,6 +45,8 @@ export default function App(): React.JSX.Element {
   const [typeFilter, setTypeFilter] = useState<FilterType>('all')
   const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null)
   const [showImport, setShowImport] = useState(false)
+  const [editing, setEditing] = useState<GeneratedImage | null>(null)
+  const [deleting, setDeleting] = useState<GeneratedImage | null>(null)
 
   // 从数据库加载图片和元数据
   const loadData = useCallback(async () => {
@@ -116,6 +120,43 @@ export default function App(): React.JSX.Element {
     setImages((prev) => prev.map((img) => img.id === id ? { ...img, rating } : img))
     if (selectedImage?.id === id) setSelectedImage((prev) => prev ? { ...prev, rating } : prev)
   }, [selectedImage])
+
+  // 编辑保存后：重新加载数据，并用最新记录刷新详情页
+  const handleEditSaved = useCallback(async () => {
+    const editingId = editing?.id
+    await loadData()
+    if (editingId) {
+      const res = await window.api.getImages()
+      if (res.ok && res.data) {
+        const updated = res.data.find((r) => r.id === editingId)
+        if (updated && selectedImage?.id === editingId) {
+          setSelectedImage(toGenerated(updated))
+        }
+      }
+    }
+  }, [editing, loadData, selectedImage])
+
+  // 确认删除
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleting) return
+    const delId = deleting.id
+    const idx = filteredImages.findIndex((img) => img.id === delId)
+    const result = await window.api.deleteImage(delId)
+    setDeleting(null)
+    if (!result.ok) return
+
+    // 详情页开着这张图：切到下一张（没有则上一张，都没有则关闭）
+    if (selectedImage?.id === delId) {
+      const rest = filteredImages.filter((img) => img.id !== delId)
+      if (rest.length === 0) {
+        setSelectedImage(null)
+      } else {
+        const nextIdx = Math.min(idx, rest.length - 1)
+        setSelectedImage(rest[nextIdx])
+      }
+    }
+    await loadData()
+  }, [deleting, filteredImages, selectedImage, loadData])
 
   return (
     <div className="flex h-full flex-col bg-neutral-950 text-neutral-100">
@@ -230,6 +271,8 @@ export default function App(): React.JSX.Element {
           hasPrev={selectedIdx > 0}
           hasNext={selectedIdx < filteredImages.length - 1}
           onRatingChange={handleRatingChange}
+          onEdit={() => setEditing(selectedImage)}
+          onDelete={() => setDeleting(selectedImage)}
         />
       )}
 
@@ -238,6 +281,27 @@ export default function App(): React.JSX.Element {
         <ImportModal
           onClose={() => setShowImport(false)}
           onImported={loadData}
+        />
+      )}
+
+      {/* 编辑模态 */}
+      {editing && (
+        <EditModal
+          image={editing}
+          onClose={() => setEditing(null)}
+          onSaved={handleEditSaved}
+        />
+      )}
+
+      {/* 删除确认 */}
+      {deleting && (
+        <ConfirmDialog
+          danger
+          title="删除这张图片？"
+          message={`「${deleting.title}」将被永久删除，包括本地图片文件和缩略图，无法恢复。`}
+          confirmText="删除"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleting(null)}
         />
       )}
     </div>
