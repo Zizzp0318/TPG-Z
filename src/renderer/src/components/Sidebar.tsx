@@ -128,7 +128,7 @@ export function Sidebar({
                     {f === '全部' ? (
                       <span className="flex items-center gap-1.5">
                         <Image size={13} />
-                        全部图片
+                        全部作品
                       </span>
                     ) : (
                       f

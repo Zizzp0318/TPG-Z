@@ -292,7 +292,7 @@ export function DetailView({
           {hasRefs && image.referenceImages.length > 0 && (
             <div>
               <div className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-                参考图
+                参考素材
               </div>
               <div className="flex flex-wrap gap-2">
                 {image.referenceImages.map((ref) =>

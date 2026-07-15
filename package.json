@@ -1,6 +1,6 @@
 {
   "name": "tpg-z",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AI 生成图片管理软件",
   "main": "./out/main/index.mjs",
   "author": "",

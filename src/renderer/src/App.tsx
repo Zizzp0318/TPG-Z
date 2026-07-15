@@ -188,7 +188,7 @@ export default function App(): React.JSX.Element {
       <header className="flex h-14 shrink-0 items-center gap-3 border-b border-neutral-800 px-4">
         <div className="flex items-center gap-2 mr-2">
           <ImageIcon size={20} className="text-indigo-400" />
-          <span className="text-sm font-semibold tracking-tight">AI 图片管理</span>
+          <span className="text-sm font-semibold tracking-tight">AI 作品管理</span>
         </div>
 
         <div className="mx-2 h-5 w-px bg-neutral-700" />
