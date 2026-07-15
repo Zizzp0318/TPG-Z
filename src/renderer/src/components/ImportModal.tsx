@@ -8,6 +8,10 @@ import { RefThumb } from './RefThumb'
 interface ImportModalProps {
   onClose: () => void
   onImported: () => void // 导入成功后刷新列表
+  /** 已有文件夹列表（供选择） */
+  existingFolders?: string[]
+  /** 已有标签列表（供选择） */
+  existingTags?: string[]
 }
 
 interface RefPreview {
@@ -15,12 +19,17 @@ interface RefPreview {
   dataUrl: string
 }
 
-export function ImportModal({ onClose, onImported }: ImportModalProps) {
+export function ImportModal({
+  onClose,
+  onImported,
+  existingFolders = [],
+  existingTags = []
+}: ImportModalProps) {
   const [srcPath, setSrcPath] = useState('')
   const [srcPreview, setSrcPreview] = useState('')
   const [title, setTitle] = useState('')
   const [prompt, setPrompt] = useState('')
-  const [type, setType] = useState<'text2img' | 'img2img'>('text2img')
+  const [type, setType] = useState<'text2img' | 'img2img' | 'text2video' | 'ref2video'>('text2img')
   const [folder, setFolder] = useState('未分类')
   const [tagInput, setTagInput] = useState('')
   const [tags, setTags] = useState<string[]>([])
@@ -28,9 +37,16 @@ export function ImportModal({ onClose, onImported }: ImportModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // 选择主图
+  // 当前类型是否为视频类
+  const isVideoType = type === 'text2video' || type === 'ref2video'
+  // 当前类型是否需要参考图
+  const hasRefs = type === 'img2img' || type === 'ref2video'
+
+  // 选择主文件（图片或视频，根据当前类型切换对话框）
   const pickMainImage = useCallback(async () => {
-    const result = await window.api.selectFile()
+    const result = isVideoType
+      ? await window.api.selectVideo()
+      : await window.api.selectFile()
     if (!result.ok || !result.data) return
     const path = result.data
     setSrcPath(path)
@@ -38,7 +54,7 @@ export function ImportModal({ onClose, onImported }: ImportModalProps) {
     // 用文件名作为默认标题
     const name = path.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, '') ?? '未命名'
     if (!title) setTitle(name)
-  }, [title])
+  }, [isVideoType, title])
 
   // 选择参考图
   const pickRefImages = useCallback(async () => {
@@ -62,7 +78,7 @@ export function ImportModal({ onClose, onImported }: ImportModalProps) {
 
   // 提交导入
   const handleImport = async () => {
-    if (!srcPath) { setError('请先选择图片'); return }
+    if (!srcPath) { setError(isVideoType ? '请先选择视频' : '请先选择图片'); return }
     setLoading(true)
     setError('')
     try {
@@ -91,7 +107,7 @@ export function ImportModal({ onClose, onImported }: ImportModalProps) {
       <div className="flex h-[90vh] w-[780px] max-w-[95vw] flex-col rounded-xl border border-neutral-700 bg-neutral-900 shadow-2xl">
         {/* 标题栏 */}
         <div className="flex items-center justify-between border-b border-neutral-800 px-5 py-4">
-          <h2 className="text-sm font-semibold text-neutral-100">导入 AI 生成图片</h2>
+          <h2 className="text-sm font-semibold text-neutral-100">导入 AI 生成作品</h2>
           <button onClick={onClose} className="rounded p-1 text-neutral-400 hover:bg-neutral-800 hover:text-white">
             <X size={16} />
           </button>
@@ -100,16 +116,29 @@ export function ImportModal({ onClose, onImported }: ImportModalProps) {
         <div className="flex flex-1 overflow-hidden">
           {/* 左：图片选择 */}
           <div className="flex w-64 shrink-0 flex-col border-r border-neutral-800 p-4 gap-4">
-            {/* 主图 */}
+            {/* 主文件（图片 or 视频） */}
             <div>
-              <p className="mb-2 text-xs font-medium text-neutral-500">生成结果图片</p>
-              {srcPreview ? (
+              <p className="mb-2 text-xs font-medium text-neutral-500">
+                {isVideoType ? '生成结果视频' : '生成结果图片'}
+              </p>
+              {srcPath ? (
                 <div className="relative">
-                  <img
-                    src={srcPreview}
-                    alt="预览"
-                    className="h-44 w-full rounded-lg object-cover ring-1 ring-neutral-700"
-                  />
+                  {isVideoPath(srcPath) ? (
+                    /* 视频：显示首帧预览（静音、不自动播放，加载后停在首帧） */
+                    <video
+                      src={srcPreview}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      className="h-44 w-full rounded-lg object-cover ring-1 ring-neutral-700 bg-black"
+                    />
+                  ) : (
+                    <img
+                      src={srcPreview}
+                      alt="预览"
+                      className="h-44 w-full rounded-lg object-cover ring-1 ring-neutral-700"
+                    />
+                  )}
                   <button
                     onClick={() => { setSrcPath(''); setSrcPreview('') }}
                     className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1 text-white/80 hover:bg-black/90"
@@ -123,15 +152,15 @@ export function ImportModal({ onClose, onImported }: ImportModalProps) {
                   className="flex h-44 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-neutral-700 text-neutral-500 hover:border-indigo-500 hover:text-indigo-400"
                 >
                   <Upload size={24} />
-                  <span className="text-xs">点击选择图片</span>
+                  <span className="text-xs">{isVideoType ? '点击选择视频' : '点击选择图片'}</span>
                 </button>
               )}
             </div>
 
-            {/* 参考图（图生图模式） */}
-            {type === 'img2img' && (
+            {/* 参考图（图生图 / 参考生视频模式） */}
+            {hasRefs && (
               <div className="flex-1">
-                <p className="mb-2 text-xs font-medium text-neutral-500">参考图（可多张）</p>
+                <p className="mb-2 text-xs font-medium text-neutral-500">上传参考素材（图片或视频，可多张）</p>
                 <div className="flex flex-wrap gap-2">
                   {refs.map((ref, i) => (
                     <div key={i} className="group relative">
@@ -162,8 +191,8 @@ export function ImportModal({ onClose, onImported }: ImportModalProps) {
             {/* 生成方式 */}
             <div>
               <label className="mb-1.5 block text-xs font-medium text-neutral-500">生成方式</label>
-              <div className="flex gap-2">
-                {(['text2img', 'img2img'] as const).map((t) => (
+              <div className="flex flex-wrap gap-2">
+                {(['text2img', 'img2img', 'text2video', 'ref2video'] as const).map((t) => (
                   <button
                     key={t}
                     onClick={() => setType(t)}
@@ -171,7 +200,10 @@ export function ImportModal({ onClose, onImported }: ImportModalProps) {
                       type === t ? 'bg-indigo-600 text-white' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
                     }`}
                   >
-                    {t === 'text2img' ? '✍️ 文生图' : '🖼 图生图'}
+                    {t === 'text2img' ? '✍️ 文生图'
+                      : t === 'img2img' ? '🖼 图生图'
+                      : t === 'text2video' ? '🎬 文生视频'
+                      : '🎞 参考生视频'}
                   </button>
                 ))}
               </div>
@@ -201,16 +233,40 @@ export function ImportModal({ onClose, onImported }: ImportModalProps) {
               />
             </div>
 
-            {/* 文件夹 */}
+            {/* 文件夹：可从已有中选，也可输入新的 */}
             <div>
               <label className="mb-1.5 block text-xs font-medium text-neutral-500">文件夹</label>
               <input
                 type="text"
+                list="import-folder-options"
                 value={folder}
                 onChange={(e) => setFolder(e.target.value)}
-                placeholder="输入文件夹名称，如：人物"
+                placeholder="选择已有文件夹，或输入新名称"
                 className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-indigo-500"
               />
+              <datalist id="import-folder-options">
+                {existingFolders.map((f) => (
+                  <option key={f} value={f} />
+                ))}
+              </datalist>
+              {existingFolders.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {existingFolders.map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setFolder(f)}
+                      className={`rounded-full px-2.5 py-0.5 text-xs transition-colors ${
+                        folder === f
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200'
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* 标签 */}
@@ -239,6 +295,25 @@ export function ImportModal({ onClose, onImported }: ImportModalProps) {
                       </button>
                     </span>
                   ))}
+                </div>
+              )}
+              {/* 已有标签快捷选择（排除已添加的） */}
+              {existingTags.filter((t) => !tags.includes(t)).length > 0 && (
+                <div className="mt-2">
+                  <p className="mb-1 text-[11px] text-neutral-600">已有标签，点击添加：</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {existingTags.filter((t) => !tags.includes(t)).map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => setTags((prev) => [...prev, tag])}
+                        className="flex items-center gap-0.5 rounded-full bg-neutral-800 px-2.5 py-0.5 text-xs text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200"
+                      >
+                        <Plus size={10} />
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

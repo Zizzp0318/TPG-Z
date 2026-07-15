@@ -39,9 +39,21 @@ const api = {
   selectImages: (): Promise<IpcResult<string[]>> =>
     ipcRenderer.invoke('dialog:selectImages'),
 
-  /** 打开文件选择对话框（单选） */
+  /** 打开文件选择对话框（单选，仅图片） */
   selectFile: (): Promise<IpcResult<string>> =>
-    ipcRenderer.invoke('dialog:selectFile')
+    ipcRenderer.invoke('dialog:selectFile'),
+
+  /** 打开文件选择对话框（单选，仅视频） */
+  selectVideo: (): Promise<IpcResult<string>> =>
+    ipcRenderer.invoke('dialog:selectVideo'),
+
+  /** 用系统文件管理器打开数据目录 */
+  openDataDir: (): Promise<IpcResult> =>
+    ipcRenderer.invoke('data:openDir'),
+
+  /** 一键备份：把数据目录复制到用户选定位置，返回备份路径 */
+  backupData: (): Promise<IpcResult<string>> =>
+    ipcRenderer.invoke('data:backup')
 }
 
 if (process.contextIsolated) {

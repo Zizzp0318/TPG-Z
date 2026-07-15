@@ -1,5 +1,5 @@
 /**
- * 视频转 GIF — 调用系统 ffmpeg
+ * 视频转 GIF — 调用内置 ffmpeg（ffmpeg-static，随软件分发，用户无需自行安装）
  * 参数：16fps，最长边缩到 480，用两遍调色板法保证质量
  */
 import { spawn } from 'child_process'
@@ -7,6 +7,8 @@ import { join } from 'path'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
 import { existsSync, rmSync } from 'fs'
+import { app } from 'electron'
+import ffmpegStatic from 'ffmpeg-static'
 
 /** 预处理结果：落地用的路径 + 是否为需清理的临时文件 */
 export interface ProcessedRef {
@@ -22,10 +24,28 @@ export function isVideoFile(path: string): boolean {
   return VIDEO_EXTS.includes(ext)
 }
 
+/**
+ * 解析 ffmpeg 可执行文件路径：
+ * - ffmpeg-static 返回 node_modules 里的绝对路径
+ * - 打包后二进制被 asarUnpack 解压到 app.asar.unpacked，需要修正路径
+ * - 找不到内置二进制时兜底回退系统 PATH 上的 ffmpeg
+ */
+let cachedFfmpeg: string | null = null
+function ffmpegBin(): string {
+  if (cachedFfmpeg) return cachedFfmpeg
+  let p = (ffmpegStatic as unknown as string) || ''
+  if (p && app.isPackaged) {
+    p = p.replace('app.asar', 'app.asar.unpacked')
+  }
+  cachedFfmpeg = p && existsSync(p) ? p : 'ffmpeg'
+  console.log(`[video] 使用 ffmpeg: ${cachedFfmpeg}`)
+  return cachedFfmpeg
+}
+
 /** 运行 ffmpeg，返回 Promise（失败时 reject 带 stderr） */
 function runFfmpeg(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn('ffmpeg', args, { windowsHide: true })
+    const proc = spawn(ffmpegBin(), args, { windowsHide: true })
     let stderr = ''
     proc.stderr.on('data', (d) => {
       stderr += d.toString()
@@ -86,6 +106,29 @@ export async function convertVideoToGif(
       }
     }
   }
+}
+
+/**
+ * 抽取视频首帧，保存为 JPEG（用作列表缩略图 / 导入预览）。
+ * @param srcPath 源视频绝对路径
+ * @param destPath 输出 JPEG 绝对路径
+ * @param maxEdge 最长边像素，默认 420
+ */
+export async function extractFirstFrame(
+  srcPath: string,
+  destPath: string,
+  maxEdge = 420
+): Promise<void> {
+  const scale = `scale=w='if(gt(a,1),${maxEdge},-2)':h='if(gt(a,1),-2,${maxEdge})':flags=lanczos`
+  // -frames:v 1 只输出一帧（首帧），-q:v 3 高质量 JPEG
+  await runFfmpeg([
+    '-y',
+    '-i', srcPath,
+    '-vf', scale,
+    '-frames:v', '1',
+    '-q:v', '3',
+    destPath
+  ])
 }
 
 /**

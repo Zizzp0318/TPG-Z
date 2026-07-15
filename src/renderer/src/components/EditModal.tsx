@@ -10,6 +10,10 @@ interface EditModalProps {
   image: GeneratedImage
   onClose: () => void
   onSaved: () => void // 保存成功后刷新
+  /** 已有文件夹列表（供选择） */
+  existingFolders?: string[]
+  /** 已有标签列表（供选择） */
+  existingTags?: string[]
 }
 
 // 已有参考图（带 id）与新增参考图（带本地路径）统一表示
@@ -20,10 +24,16 @@ interface RefItem {
   newPath?: string // 新增参考图的绝对路径
 }
 
-export function EditModal({ image, onClose, onSaved }: EditModalProps) {
+export function EditModal({
+  image,
+  onClose,
+  onSaved,
+  existingFolders = [],
+  existingTags = []
+}: EditModalProps) {
   const [title, setTitle] = useState(image.title)
   const [prompt, setPrompt] = useState(image.prompt)
-  const [type, setType] = useState<'text2img' | 'img2img'>(image.type)
+  const [type, setType] = useState<'text2img' | 'img2img' | 'text2video' | 'ref2video'>(image.type)
   const [folder, setFolder] = useState(image.folder)
   const [tagInput, setTagInput] = useState('')
   const [tags, setTags] = useState<string[]>(image.tags)
@@ -63,8 +73,8 @@ export function EditModal({ image, onClose, onSaved }: EditModalProps) {
         type,
         folder,
         tags,
-        keepRefIds: type === 'img2img' ? refs.filter((r) => r.existingId).map((r) => r.existingId!) : [],
-        newRefPaths: type === 'img2img' ? refs.filter((r) => r.newPath).map((r) => r.newPath!) : []
+        keepRefIds: (type === 'img2img' || type === 'ref2video') ? refs.filter((r) => r.existingId).map((r) => r.existingId!) : [],
+        newRefPaths: (type === 'img2img' || type === 'ref2video') ? refs.filter((r) => r.newPath).map((r) => r.newPath!) : []
       }
       const result = await window.api.updateImage(payload)
       if (!result.ok) { setError(result.error ?? '保存失败'); return }
@@ -92,8 +102,8 @@ export function EditModal({ image, onClose, onSaved }: EditModalProps) {
           {/* 生成方式 */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-neutral-500">生成方式</label>
-            <div className="flex gap-2">
-              {(['text2img', 'img2img'] as const).map((t) => (
+            <div className="flex flex-wrap gap-2">
+              {(['text2img', 'img2img', 'text2video', 'ref2video'] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setType(t)}
@@ -101,16 +111,19 @@ export function EditModal({ image, onClose, onSaved }: EditModalProps) {
                     type === t ? 'bg-indigo-600 text-white' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
                   }`}
                 >
-                  {t === 'text2img' ? '✍️ 文生图' : '🖼 图生图'}
+                  {t === 'text2img' ? '✍️ 文生图'
+                    : t === 'img2img' ? '🖼 图生图'
+                    : t === 'text2video' ? '🎬 文生视频'
+                    : '🎞 参考生视频'}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* 参考图（图生图模式） */}
-          {type === 'img2img' && (
+          {/* 参考图（图生图 / 参考生视频模式） */}
+          {(type === 'img2img' || type === 'ref2video') && (
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-neutral-500">参考图（可多张）</label>
+              <label className="mb-1.5 block text-xs font-medium text-neutral-500">上传参考素材（图片或视频，可多张）</label>
               <div className="flex flex-wrap gap-2">
                 {refs.map((ref) => (
                   <div key={ref.key} className="group relative">
@@ -157,15 +170,40 @@ export function EditModal({ image, onClose, onSaved }: EditModalProps) {
             />
           </div>
 
-          {/* 文件夹 */}
+          {/* 文件夹：可从已有中选，也可输入新的 */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-neutral-500">文件夹</label>
             <input
               type="text"
+              list="edit-folder-options"
               value={folder}
               onChange={(e) => setFolder(e.target.value)}
+              placeholder="选择已有文件夹，或输入新名称"
               className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-indigo-500"
             />
+            <datalist id="edit-folder-options">
+              {existingFolders.map((f) => (
+                <option key={f} value={f} />
+              ))}
+            </datalist>
+            {existingFolders.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {existingFolders.map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setFolder(f)}
+                    className={`rounded-full px-2.5 py-0.5 text-xs transition-colors ${
+                      folder === f
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200'
+                    }`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 标签 */}
@@ -194,6 +232,25 @@ export function EditModal({ image, onClose, onSaved }: EditModalProps) {
                     </button>
                   </span>
                 ))}
+              </div>
+            )}
+            {/* 已有标签快捷选择（排除已添加的） */}
+            {existingTags.filter((t) => !tags.includes(t)).length > 0 && (
+              <div className="mt-2">
+                <p className="mb-1 text-[11px] text-neutral-600">已有标签，点击添加：</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {existingTags.filter((t) => !tags.includes(t)).map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setTags((prev) => [...prev, tag])}
+                      className="flex items-center gap-0.5 rounded-full bg-neutral-800 px-2.5 py-0.5 text-xs text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200"
+                    >
+                      <Plus size={10} />
+                      {tag}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>

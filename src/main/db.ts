@@ -5,7 +5,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'path'
 import { app } from 'electron'
-import { mkdirSync, copyFileSync, existsSync, rmSync } from 'fs'
+import { mkdirSync, copyFileSync, existsSync, rmSync, cpSync } from 'fs'
 import { randomUUID } from 'crypto'
 import { nativeImage } from 'electron'
 import { writeFileSync } from 'fs'
@@ -19,13 +19,51 @@ export function getDataDir(): string {
   return dataDir
 }
 
+/**
+ * 解析数据目录：
+ * - 开发模式：项目根目录下的 data/（跟随项目，不进 C 盘用户目录）
+ * - 打包后：仍用系统 userData/tpg-z，保证正常安装使用时可写
+ */
+function resolveDataDir(): string {
+  if (app.isPackaged) {
+    return join(app.getPath('userData'), 'tpg-z')
+  }
+  // 开发模式：process.cwd() 即运行 npm run dev 的项目根目录
+  return join(process.cwd(), 'data')
+}
+
+/**
+ * 首次迁移：若新数据目录为空（无数据库），且旧的 userData 目录存在数据库，
+ * 则把旧数据整体复制过来（只复制不删除，旧数据作为保险保留）。
+ */
+function migrateFromUserData(target: string): void {
+  const legacyDir = join(app.getPath('userData'), 'tpg-z')
+  const legacyDb = join(legacyDir, 'tpg.db')
+  const targetDb = join(target, 'tpg.db')
+  // 目标已有数据库，或旧目录不存在数据库，或二者是同一目录 → 不迁移
+  if (existsSync(targetDb) || !existsSync(legacyDb) || legacyDir === target) return
+  try {
+    // 整目录复制（含 images/thumbs/refs 和 tpg.db、-wal、-shm）
+    cpSync(legacyDir, target, { recursive: true })
+    console.log(`[db] 已从旧数据目录迁移: ${legacyDir} -> ${target}`)
+  } catch (e) {
+    console.error('[db] 数据迁移失败:', e)
+  }
+}
+
 /** 初始化数据库，在 app.whenReady() 之后调用 */
 export function initDb(): void {
-  dataDir = join(app.getPath('userData'), 'tpg-z')
+  dataDir = resolveDataDir()
+  mkdirSync(dataDir, { recursive: true })
+
+  // 首次启动时尝试从旧的 C 盘用户目录迁移历史数据
+  migrateFromUserData(dataDir)
+
   mkdirSync(join(dataDir, 'images'), { recursive: true })
   mkdirSync(join(dataDir, 'thumbs'), { recursive: true })
   mkdirSync(join(dataDir, 'refs'), { recursive: true })
 
+  console.log(`[db] 数据目录: ${dataDir}`)
   db = new DatabaseSync(join(dataDir, 'tpg.db'))
 
   db.exec(`
@@ -132,18 +170,22 @@ export function dbGetImages(): ImageRecord[] {
 
 // ---------- 导入 ----------
 
-/** 导入一张图片，返回新记录 */
-export function dbImportImage(payload: ImportPayload): ImageRecord {
+/**
+ * 导入一件作品，返回新记录
+ * @param payload 表单数据
+ * @param thumbSrcPath 缩略图源图路径（视频作品传抽好的首帧 JPEG；不传则用主文件本身）
+ */
+export function dbImportImage(payload: ImportPayload, thumbSrcPath?: string): ImageRecord {
   const d = getDb()
   const id = randomUUID()
   const ext = payload.srcPath.split('.').pop() ?? 'jpg'
   const filename = `${id}.${ext}`
   const thumbName = `${id}_thumb.jpg`
 
-  // 复制原图
+  // 复制主文件（图片或视频）
   copyFileSync(payload.srcPath, join(dataDir, 'images', filename))
-  // 生成缩略图
-  makeThumbnail(payload.srcPath, join(dataDir, 'thumbs', thumbName))
+  // 生成缩略图：视频用首帧 JPEG，图片用自身
+  makeThumbnail(thumbSrcPath ?? payload.srcPath, join(dataDir, 'thumbs', thumbName))
 
   const now = new Date().toISOString()
 

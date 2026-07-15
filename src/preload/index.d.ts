@@ -13,6 +13,9 @@ declare global {
       getTags(): Promise<IpcResult<string[]>>
       selectImages(): Promise<IpcResult<string[]>>
       selectFile(): Promise<IpcResult<string>>
+      selectVideo(): Promise<IpcResult<string>>
+      openDataDir(): Promise<IpcResult>
+      backupData(): Promise<IpcResult<string>>
     }
   }
 }

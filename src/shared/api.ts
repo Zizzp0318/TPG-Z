@@ -8,7 +8,7 @@ export interface ImageRecord {
   imagePath: string
   thumbPath: string
   prompt: string
-  type: 'text2img' | 'img2img'
+  type: 'text2img' | 'img2img' | 'text2video' | 'ref2video'
   folder: string
   rating: number
   createdAt: string
@@ -22,10 +22,10 @@ export interface ImportPayload {
   srcPath: string
   title: string
   prompt: string
-  type: 'text2img' | 'img2img'
+  type: 'text2img' | 'img2img' | 'text2video' | 'ref2video'
   folder: string
   tags: string[]
-  /** 参考图的绝对路径列表（图生图模式） */
+  /** 参考图的绝对路径列表（图生图 / 参考生视频模式） */
   refPaths: string[]
 }
 
@@ -34,7 +34,7 @@ export interface UpdatePayload {
   id: string
   title: string
   prompt: string
-  type: 'text2img' | 'img2img'
+  type: 'text2img' | 'img2img' | 'text2video' | 'ref2video'
   folder: string
   tags: string[]
   /** 保留的已有参考图 id 列表（不在此列表内的旧参考图会被删除） */

@@ -9,7 +9,7 @@ import { ConfirmDialog } from './components/ConfirmDialog'
 import type { ImageRecord } from '../../shared/api'
 import { GeneratedImage, ViewMode } from './types'
 
-type FilterType = 'all' | 'text2img' | 'img2img'
+type FilterType = 'all' | 'text2img' | 'img2img' | 'text2video' | 'ref2video'
 
 /** 把 ImageRecord（主进程格式）转成渲染层用的 GeneratedImage */
 function toGenerated(r: ImageRecord): GeneratedImage {
@@ -171,7 +171,7 @@ export default function App(): React.JSX.Element {
 
         {/* 类型筛选 */}
         <div className="flex gap-1 text-xs">
-          {(['all', 'text2img', 'img2img'] as FilterType[]).map((t) => (
+          {(['all', 'text2img', 'img2img', 'text2video', 'ref2video'] as FilterType[]).map((t) => (
             <button
               key={t}
               onClick={() => setTypeFilter(t)}
@@ -181,7 +181,11 @@ export default function App(): React.JSX.Element {
                   : 'text-neutral-400 hover:bg-neutral-800 hover:text-white'
               }`}
             >
-              {t === 'all' ? '全部' : t === 'text2img' ? '文生图' : '图生图'}
+              {t === 'all' ? '全部'
+                : t === 'text2img' ? '文生图'
+                : t === 'img2img' ? '图生图'
+                : t === 'text2video' ? '文生视频'
+                : '参考生视频'}
             </button>
           ))}
         </div>
@@ -224,7 +228,7 @@ export default function App(): React.JSX.Element {
           className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500"
         >
           <Plus size={14} />
-          导入图片
+          导入作品
         </button>
       </header>
 
@@ -281,6 +285,8 @@ export default function App(): React.JSX.Element {
         <ImportModal
           onClose={() => setShowImport(false)}
           onImported={loadData}
+          existingFolders={folders.filter((f) => f !== '全部')}
+          existingTags={allTags}
         />
       )}
 
@@ -290,6 +296,8 @@ export default function App(): React.JSX.Element {
           image={editing}
           onClose={() => setEditing(null)}
           onSaved={handleEditSaved}
+          existingFolders={folders.filter((f) => f !== '全部')}
+          existingTags={allTags}
         />
       )}
 

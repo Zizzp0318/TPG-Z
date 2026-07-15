@@ -1,7 +1,7 @@
 /**
  * IPC 处理器 — 注册所有主进程 ↔ 渲染进程的通信接口
  */
-import { ipcMain, dialog } from 'electron'
+import { ipcMain, dialog, shell } from 'electron'
 import {
   dbGetImages,
   dbImportImage,
@@ -10,9 +10,15 @@ import {
   dbUpdateRating,
   dbUpdateTags,
   dbGetFolders,
-  dbGetTags
+  dbGetTags,
+  getDataDir
 } from './db'
-import { preprocessRefPaths, cleanupTemp } from './video'
+import { cpSync } from 'fs'
+import { preprocessRefPaths, cleanupTemp, isVideoFile, extractFirstFrame } from './video'
+import { join } from 'path'
+import { tmpdir } from 'os'
+import { randomUUID } from 'crypto'
+import { existsSync, rmSync } from 'fs'
 import type { ImportPayload, UpdatePayload, IpcResult, ImageRecord } from '../shared/api'
 
 export function registerIpcHandlers(): void {
@@ -30,11 +36,27 @@ export function registerIpcHandlers(): void {
     try {
       // 参考图预处理：视频转 GIF，图片原样
       const processed = await preprocessRefPaths(payload.refPaths)
+      // 主文件是视频：抽首帧当缩略图源
+      let framePath: string | undefined
+      if (isVideoFile(payload.srcPath)) {
+        framePath = join(tmpdir(), `tpgz-frame-${randomUUID()}.jpg`)
+        try {
+          await extractFirstFrame(payload.srcPath, framePath)
+        } catch {
+          framePath = undefined // 抽帧失败时退回默认逻辑
+        }
+      }
       try {
-        const record = dbImportImage({ ...payload, refPaths: processed.map((r) => r.path) })
+        const record = dbImportImage(
+          { ...payload, refPaths: processed.map((r) => r.path) },
+          framePath
+        )
         return { ok: true, data: record }
       } finally {
         cleanupTemp(processed)
+        if (framePath && existsSync(framePath)) {
+          try { rmSync(framePath, { force: true }) } catch { /* 忽略 */ }
+        }
       }
     } catch (e) {
       return { ok: false, error: String(e) }
@@ -136,6 +158,61 @@ export function registerIpcHandlers(): void {
       })
       if (result.canceled || result.filePaths.length === 0) return { ok: true, data: '' }
       return { ok: true, data: result.filePaths[0] }
+    } catch (e) {
+      return { ok: false, error: String(e) }
+    }
+  })
+
+  ipcMain.handle('dialog:selectVideo', async (): Promise<IpcResult<string>> => {
+    try {
+      const result = await dialog.showOpenDialog({
+        title: '选择视频',
+        filters: [
+          {
+            name: '视频',
+            extensions: ['mp4', 'mov', 'webm', 'avi', 'mkv', 'm4v', 'flv', 'wmv']
+          }
+        ],
+        properties: ['openFile']
+      })
+      if (result.canceled || result.filePaths.length === 0) return { ok: true, data: '' }
+      return { ok: true, data: result.filePaths[0] }
+    } catch (e) {
+      return { ok: false, error: String(e) }
+    }
+  })
+
+  // ---------- 打开数据目录 ----------
+  ipcMain.handle('data:openDir', async (): Promise<IpcResult> => {
+    try {
+      const err = await shell.openPath(getDataDir())
+      // openPath 成功返回空串，失败返回错误信息
+      if (err) return { ok: false, error: err }
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: String(e) }
+    }
+  })
+
+  // ---------- 一键备份（复制整个数据目录到用户选定位置） ----------
+  ipcMain.handle('data:backup', async (): Promise<IpcResult<string>> => {
+    try {
+      const result = await dialog.showOpenDialog({
+        title: '选择备份保存位置',
+        properties: ['openDirectory', 'createDirectory']
+      })
+      if (result.canceled || result.filePaths.length === 0) return { ok: true, data: '' }
+
+      // 目标：<所选目录>/tpg-z-backup-YYYYMMDD-HHmmss
+      const now = new Date()
+      const pad = (n: number): string => String(n).padStart(2, '0')
+      const stamp =
+        `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}` +
+        `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+      const destDir = join(result.filePaths[0], `tpg-z-backup-${stamp}`)
+
+      cpSync(getDataDir(), destDir, { recursive: true })
+      return { ok: true, data: destDir }
     } catch (e) {
       return { ok: false, error: String(e) }
     }

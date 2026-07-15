@@ -2,6 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Copy, Check, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { GeneratedImage } from '../types'
 import { StarRating } from './StarRating'
+import { isVideoType } from '../../../shared/media'
+
+// 生成方式徽标文案
+const TYPE_LABEL: Record<GeneratedImage['type'], string> = {
+  text2img: '✍️ 文生图',
+  img2img: '🖼 图生图',
+  text2video: '🎬 文生视频',
+  ref2video: '🎞 参考生视频'
+}
 
 interface DetailViewProps {
   image: GeneratedImage
@@ -111,6 +120,10 @@ export function DetailView({
   const zoomIn = () => setTransform((p) => ({ ...p, scale: Math.min(p.scale * 1.25, 5) }))
   const zoomOut = () => setTransform((p) => ({ ...p, scale: Math.max(p.scale / 1.25, 0.3) }))
 
+  const isVideo = isVideoType(image.type)
+  // 是否有参考图区域（图生图 / 参考生视频）
+  const hasRefs = image.type === 'img2img' || image.type === 'ref2video'
+
   const dateStr = new Date(image.createdAt).toLocaleDateString('zh-CN', {
     year: 'numeric',
     month: 'long',
@@ -142,44 +155,56 @@ export function DetailView({
         </div>
       )}
 
-      {/* 左侧：图片预览区 */}
+      {/* 左侧：预览区（视频用原生播放器，图片支持缩放拖拽） */}
       <div
         ref={imgRef}
         className="relative flex flex-1 items-center justify-center overflow-hidden bg-black/60 select-none"
-        onWheel={onWheel}
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}
-        style={{ cursor: dragging.current ? 'grabbing' : 'grab' }}
+        onWheel={isVideo ? undefined : onWheel}
+        onMouseDown={isVideo ? undefined : onMouseDown}
+        onMouseMove={isVideo ? undefined : onMouseMove}
+        onMouseUp={isVideo ? undefined : onMouseUp}
+        onMouseLeave={isVideo ? undefined : onMouseUp}
+        style={{ cursor: isVideo ? 'default' : dragging.current ? 'grabbing' : 'grab' }}
       >
-        <img
-          src={image.full}
-          alt={image.title}
-          draggable={false}
-          style={{
-            transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
-            transition: dragging.current ? 'none' : 'transform 0.1s ease'
-          }}
-          className="max-h-full max-w-full rounded object-contain shadow-2xl"
-        />
+        {isVideo ? (
+          <video
+            src={image.full}
+            controls
+            autoPlay
+            loop
+            className="max-h-full max-w-full rounded shadow-2xl"
+          />
+        ) : (
+          <img
+            src={image.full}
+            alt={image.title}
+            draggable={false}
+            style={{
+              transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
+              transition: dragging.current ? 'none' : 'transform 0.1s ease'
+            }}
+            className="max-h-full max-w-full rounded object-contain shadow-2xl"
+          />
+        )}
 
-        {/* 图片缩放工具栏 */}
-        <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/60 px-3 py-1.5 backdrop-blur-sm">
-          <button onClick={zoomOut} className="rounded-full p-1 text-white/70 hover:text-white" title="缩小">
-            <ZoomOut size={16} />
-          </button>
-          <span className="min-w-[44px] text-center text-xs text-white/70">
-            {Math.round(transform.scale * 100)}%
-          </span>
-          <button onClick={zoomIn} className="rounded-full p-1 text-white/70 hover:text-white" title="放大">
-            <ZoomIn size={16} />
-          </button>
-          <div className="mx-1 h-4 w-px bg-white/20" />
-          <button onClick={resetTransform} className="rounded-full p-1 text-white/70 hover:text-white" title="重置">
-            <RotateCcw size={14} />
-          </button>
-        </div>
+        {/* 图片缩放工具栏（视频不显示） */}
+        {!isVideo && (
+          <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/60 px-3 py-1.5 backdrop-blur-sm">
+            <button onClick={zoomOut} className="rounded-full p-1 text-white/70 hover:text-white" title="缩小">
+              <ZoomOut size={16} />
+            </button>
+            <span className="min-w-[44px] text-center text-xs text-white/70">
+              {Math.round(transform.scale * 100)}%
+            </span>
+            <button onClick={zoomIn} className="rounded-full p-1 text-white/70 hover:text-white" title="放大">
+              <ZoomIn size={16} />
+            </button>
+            <div className="mx-1 h-4 w-px bg-white/20" />
+            <button onClick={resetTransform} className="rounded-full p-1 text-white/70 hover:text-white" title="重置">
+              <RotateCcw size={14} />
+            </button>
+          </div>
+        )}
 
         {/* 上一张 */}
         {hasPrev && (
@@ -241,17 +266,19 @@ export function DetailView({
           <div>
             <span
               className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-                image.type === 'img2img'
-                  ? 'bg-indigo-600/30 text-indigo-300'
-                  : 'bg-emerald-600/30 text-emerald-300'
+                isVideo
+                  ? 'bg-purple-600/30 text-purple-300'
+                  : image.type === 'img2img'
+                    ? 'bg-indigo-600/30 text-indigo-300'
+                    : 'bg-emerald-600/30 text-emerald-300'
               }`}
             >
-              {image.type === 'img2img' ? '🖼 图生图' : '✍️ 文生图'}
+              {TYPE_LABEL[image.type]}
             </span>
           </div>
 
-          {/* 图生图：参考图区域 */}
-          {image.type === 'img2img' && image.referenceImages.length > 0 && (
+          {/* 图生图 / 参考生视频：参考图区域 */}
+          {hasRefs && image.referenceImages.length > 0 && (
             <div>
               <div className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
                 参考图

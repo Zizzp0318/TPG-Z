@@ -1,5 +1,5 @@
-// 图片生成方式
-export type GenerationType = 'text2img' | 'img2img'
+// 生成方式（图片 / 视频）
+export type GenerationType = 'text2img' | 'img2img' | 'text2video' | 'ref2video'
 
 // 参考图(图生图模式使用)
 export interface ReferenceImage {
