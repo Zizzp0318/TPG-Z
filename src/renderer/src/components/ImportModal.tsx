@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react'
 import { X, Upload, Plus, Image as ImageIcon, Trash2 } from 'lucide-react'
 import type { ImportPayload } from '../../../shared/api'
 import { toLocalUrl } from '../../../shared/url'
+import { isVideoPath } from '../../../shared/media'
+import { RefThumb } from './RefThumb'
 
 interface ImportModalProps {
   onClose: () => void
@@ -133,11 +135,7 @@ export function ImportModal({ onClose, onImported }: ImportModalProps) {
                 <div className="flex flex-wrap gap-2">
                   {refs.map((ref, i) => (
                     <div key={i} className="group relative">
-                      <img
-                        src={ref.dataUrl}
-                        alt="参考图"
-                        className="h-16 w-16 rounded-md object-cover ring-1 ring-neutral-700"
-                      />
+                      <RefThumb url={ref.dataUrl} path={ref.path} size={64} />
                       <button
                         onClick={() => removeRef(i)}
                         className="absolute -right-1 -top-1 hidden rounded-full bg-red-600 p-0.5 text-white group-hover:flex"
@@ -266,7 +264,11 @@ export function ImportModal({ onClose, onImported }: ImportModalProps) {
               disabled={loading || !srcPath}
               className="rounded-md bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
             >
-              {loading ? '导入中…' : '导入'}
+              {loading
+                ? refs.some((r) => isVideoPath(r.path))
+                  ? '转换视频中…'
+                  : '导入中…'
+                : '导入'}
             </button>
           </div>
         </div>

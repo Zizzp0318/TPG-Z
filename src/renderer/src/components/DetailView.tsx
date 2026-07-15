@@ -37,7 +37,8 @@ export function DetailView({
 }: DetailViewProps) {
   const [copied, setCopied] = useState(false)
   const [transform, setTransform] = useState<Transform>({ scale: 1, x: 0, y: 0 })
-  const [hoveredRef, setHoveredRef] = useState<string | null>(null)
+  // 悬浮预览的参考图：记录 url 和缩略图在屏幕上的位置，用于 fixed 定位
+  const [hoveredRef, setHoveredRef] = useState<{ url: string; rect: DOMRect } | null>(null)
   const dragging = useRef(false)
   const lastPos = useRef({ x: 0, y: 0 })
   const imgRef = useRef<HTMLDivElement>(null)
@@ -124,6 +125,23 @@ export function DetailView({
         if (e.target === e.currentTarget) onClose()
       }}
     >
+      {/* 参考图悬浮预览：fixed 定位在缩略图左侧，按原图比例显示，不被面板遮挡 */}
+      {hoveredRef && (
+        <div
+          className="pointer-events-none fixed z-[70] overflow-hidden rounded-lg bg-neutral-900 shadow-2xl ring-1 ring-neutral-600"
+          style={{
+            right: window.innerWidth - hoveredRef.rect.left + 12,
+            top: Math.max(8, Math.min(hoveredRef.rect.top, window.innerHeight - 320))
+          }}
+        >
+          <img
+            src={hoveredRef.url}
+            alt="参考图预览"
+            className="block max-h-[300px] max-w-[300px] object-contain"
+          />
+        </div>
+      )}
+
       {/* 左侧：图片预览区 */}
       <div
         ref={imgRef}
@@ -240,28 +258,16 @@ export function DetailView({
               </div>
               <div className="flex flex-wrap gap-2">
                 {image.referenceImages.map((ref) => (
-                  <div
+                  <img
                     key={ref.id}
-                    className="relative"
-                    onMouseEnter={() => setHoveredRef(ref.id)}
+                    src={ref.thumb}
+                    alt="参考图"
+                    onMouseEnter={(e) =>
+                      setHoveredRef({ url: ref.full, rect: e.currentTarget.getBoundingClientRect() })
+                    }
                     onMouseLeave={() => setHoveredRef(null)}
-                  >
-                    <img
-                      src={ref.thumb}
-                      alt="参考图"
-                      className="h-16 w-16 cursor-pointer rounded-md object-cover ring-1 ring-neutral-700 transition hover:ring-indigo-500"
-                    />
-                    {/* 悬浮预览大图 */}
-                    {hoveredRef === ref.id && (
-                      <div className="absolute bottom-full left-0 z-10 mb-2 overflow-hidden rounded-lg shadow-xl ring-1 ring-neutral-600">
-                        <img
-                          src={ref.full}
-                          alt="参考图预览"
-                          className="h-40 w-40 object-cover"
-                        />
-                      </div>
-                    )}
-                  </div>
+                    className="h-16 w-16 cursor-pointer rounded-md object-cover ring-1 ring-neutral-700 transition hover:ring-indigo-500"
+                  />
                 ))}
               </div>
             </div>

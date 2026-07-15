@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react'
 import { X, Plus, Trash2 } from 'lucide-react'
 import type { UpdatePayload } from '../../../shared/api'
 import { toLocalUrl } from '../../../shared/url'
+import { isVideoPath } from '../../../shared/media'
+import { RefThumb } from './RefThumb'
 import { GeneratedImage } from '../types'
 
 interface EditModalProps {
@@ -112,7 +114,7 @@ export function EditModal({ image, onClose, onSaved }: EditModalProps) {
               <div className="flex flex-wrap gap-2">
                 {refs.map((ref) => (
                   <div key={ref.key} className="group relative">
-                    <img src={ref.url} alt="参考图" className="h-16 w-16 rounded-md object-cover ring-1 ring-neutral-700" />
+                    <RefThumb url={ref.url} path={ref.newPath} size={64} />
                     <button
                       onClick={() => removeRef(ref.key)}
                       className="absolute -right-1 -top-1 hidden rounded-full bg-red-600 p-0.5 text-white group-hover:flex"
@@ -209,7 +211,11 @@ export function EditModal({ image, onClose, onSaved }: EditModalProps) {
             disabled={loading}
             className="rounded-md bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
           >
-            {loading ? '保存中…' : '保存'}
+            {loading
+              ? refs.some((r) => r.newPath && isVideoPath(r.newPath))
+                ? '转换视频中…'
+                : '保存中…'
+              : '保存'}
           </button>
         </div>
       </div>

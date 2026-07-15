@@ -12,6 +12,7 @@ import {
   dbGetFolders,
   dbGetTags
 } from './db'
+import { preprocessRefPaths, cleanupTemp } from './video'
 import type { ImportPayload, UpdatePayload, IpcResult, ImageRecord } from '../shared/api'
 
 export function registerIpcHandlers(): void {
@@ -25,20 +26,32 @@ export function registerIpcHandlers(): void {
   })
 
   // ---------- 导入 ----------
-  ipcMain.handle('images:import', (_e, payload: ImportPayload): IpcResult<ImageRecord> => {
+  ipcMain.handle('images:import', async (_e, payload: ImportPayload): Promise<IpcResult<ImageRecord>> => {
     try {
-      const record = dbImportImage(payload)
-      return { ok: true, data: record }
+      // 参考图预处理：视频转 GIF，图片原样
+      const processed = await preprocessRefPaths(payload.refPaths)
+      try {
+        const record = dbImportImage({ ...payload, refPaths: processed.map((r) => r.path) })
+        return { ok: true, data: record }
+      } finally {
+        cleanupTemp(processed)
+      }
     } catch (e) {
       return { ok: false, error: String(e) }
     }
   })
 
   // ---------- 编辑 ----------
-  ipcMain.handle('images:update', (_e, payload: UpdatePayload): IpcResult<ImageRecord> => {
+  ipcMain.handle('images:update', async (_e, payload: UpdatePayload): Promise<IpcResult<ImageRecord>> => {
     try {
-      const record = dbUpdateImage(payload)
-      return { ok: true, data: record }
+      // 新增参考图预处理：视频转 GIF，图片原样
+      const processed = await preprocessRefPaths(payload.newRefPaths)
+      try {
+        const record = dbUpdateImage({ ...payload, newRefPaths: processed.map((r) => r.path) })
+        return { ok: true, data: record }
+      } finally {
+        cleanupTemp(processed)
+      }
     } catch (e) {
       return { ok: false, error: String(e) }
     }
@@ -95,8 +108,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('dialog:selectImages', async (): Promise<IpcResult<string[]>> => {
     try {
       const result = await dialog.showOpenDialog({
-        title: '选择图片',
-        filters: [{ name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'] }],
+        title: '选择参考图或视频',
+        filters: [
+          {
+            name: '图片和视频',
+            extensions: [
+              'jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp',
+              'mp4', 'mov', 'webm', 'avi', 'mkv', 'm4v', 'flv', 'wmv'
+            ]
+          }
+        ],
         properties: ['openFile', 'multiSelections']
       })
       if (result.canceled) return { ok: true, data: [] }
