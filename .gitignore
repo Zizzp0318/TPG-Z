@@ -1,0 +1,10 @@
+node_modules
+dist
+out
+.DS_Store
+*.log
+.vite
+
+# 本地数据与用户图片库
+/data
+/library
