@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Image, FolderOpen, Tag, FolderCog, Save, Loader2 } from 'lucide-react'
+import { useState, type KeyboardEvent } from 'react'
+import { Image, FolderOpen, Tag, FolderCog, Save, Loader2, Pencil, Check, X } from 'lucide-react'
 
 interface SidebarProps {
   selectedFolder: string
@@ -10,6 +10,10 @@ interface SidebarProps {
   folders: string[]
   /** 来自数据库的标签列表 */
   tags: string[]
+  /** 重命名文件夹 */
+  onRenameFolder: (oldName: string, newName: string) => void
+  /** 重命名标签 */
+  onRenameTag: (oldName: string, newName: string) => void
 }
 
 export function Sidebar({
@@ -18,11 +22,39 @@ export function Sidebar({
   selectedTags,
   onTagToggle,
   folders,
-  tags
+  tags,
+  onRenameFolder,
+  onRenameTag
 }: SidebarProps) {
   const [backingUp, setBackingUp] = useState(false)
   // 底部操作提示：成功/失败短暂显示
   const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  // 正在重命名的项：kind 区分文件夹/标签，name 为原名；draft 为输入框草稿
+  const [editing, setEditing] = useState<{ kind: 'folder' | 'tag'; name: string } | null>(null)
+  const [draft, setDraft] = useState('')
+
+  const startEdit = (kind: 'folder' | 'tag', name: string): void => {
+    setEditing({ kind, name })
+    setDraft(name)
+  }
+  const cancelEdit = (): void => {
+    setEditing(null)
+    setDraft('')
+  }
+  const commitEdit = (): void => {
+    if (!editing) return
+    const to = draft.trim()
+    if (to && to !== editing.name) {
+      if (editing.kind === 'folder') onRenameFolder(editing.name, to)
+      else onRenameTag(editing.name, to)
+    }
+    cancelEdit()
+  }
+  // 输入框回车提交、Esc 取消
+  const onEditKeyDown = (e: KeyboardEvent): void => {
+    if (e.key === 'Enter') commitEdit()
+    else if (e.key === 'Escape') cancelEdit()
+  }
 
   const showNotice = (kind: 'ok' | 'err', text: string): void => {
     setNotice({ kind, text })
@@ -61,27 +93,60 @@ export function Sidebar({
             文件夹
           </div>
           <nav className="space-y-0.5 text-sm">
-            {folders.map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => onFolderChange(f)}
-                className={`w-full rounded-md px-3 py-1.5 text-left transition-colors ${
-                  selectedFolder === f
-                    ? 'bg-indigo-600/30 text-indigo-300'
-                    : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'
-                }`}
-              >
-                {f === '全部' ? (
-                  <span className="flex items-center gap-1.5">
-                    <Image size={13} />
-                    全部图片
-                  </span>
-                ) : (
-                  f
-                )}
-              </button>
-            ))}
+            {folders.map((f) => {
+              const isEditing = editing?.kind === 'folder' && editing.name === f
+              if (isEditing) {
+                return (
+                  <div key={f} className="flex items-center gap-1 px-1">
+                    <input
+                      autoFocus
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={onEditKeyDown}
+                      className="min-w-0 flex-1 rounded border border-indigo-500 bg-neutral-900 px-2 py-1 text-sm outline-none"
+                    />
+                    <button type="button" onClick={commitEdit} title="确定" className="shrink-0 rounded p-1 text-emerald-400 hover:bg-neutral-800">
+                      <Check size={14} />
+                    </button>
+                    <button type="button" onClick={cancelEdit} title="取消" className="shrink-0 rounded p-1 text-neutral-400 hover:bg-neutral-800">
+                      <X size={14} />
+                    </button>
+                  </div>
+                )
+              }
+              return (
+                <div key={f} className="group flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => onFolderChange(f)}
+                    className={`min-w-0 flex-1 truncate rounded-md px-3 py-1.5 text-left transition-colors ${
+                      selectedFolder === f
+                        ? 'bg-indigo-600/30 text-indigo-300'
+                        : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'
+                    }`}
+                  >
+                    {f === '全部' ? (
+                      <span className="flex items-center gap-1.5">
+                        <Image size={13} />
+                        全部图片
+                      </span>
+                    ) : (
+                      f
+                    )}
+                  </button>
+                  {f !== '全部' && (
+                    <button
+                      type="button"
+                      onClick={() => startEdit('folder', f)}
+                      title="重命名"
+                      className="ml-0.5 shrink-0 rounded p-1 text-neutral-500 opacity-0 transition-opacity hover:bg-neutral-800 hover:text-neutral-200 group-hover:opacity-100"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  )}
+                </div>
+              )
+            })}
           </nav>
         </div>
 
@@ -94,20 +159,50 @@ export function Sidebar({
                 标签
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {tags.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => onTagToggle(tag)}
-                    className={`rounded-full px-2.5 py-0.5 text-xs transition-colors ${
-                      selectedTags.includes(tag)
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200'
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                ))}
+                {tags.map((tag) => {
+                  const isEditing = editing?.kind === 'tag' && editing.name === tag
+                  if (isEditing) {
+                    return (
+                      <div key={tag} className="flex items-center gap-1">
+                        <input
+                          autoFocus
+                          value={draft}
+                          onChange={(e) => setDraft(e.target.value)}
+                          onKeyDown={onEditKeyDown}
+                          className="w-24 rounded border border-indigo-500 bg-neutral-900 px-2 py-0.5 text-xs outline-none"
+                        />
+                        <button type="button" onClick={commitEdit} title="确定" className="rounded p-0.5 text-emerald-400 hover:bg-neutral-800">
+                          <Check size={12} />
+                        </button>
+                        <button type="button" onClick={cancelEdit} title="取消" className="rounded p-0.5 text-neutral-400 hover:bg-neutral-800">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    )
+                  }
+                  return (
+                    <span
+                      key={tag}
+                      className={`group inline-flex items-center gap-1 rounded-full pl-2.5 pr-1.5 py-0.5 text-xs transition-colors ${
+                        selectedTags.includes(tag)
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200'
+                      }`}
+                    >
+                      <button type="button" onClick={() => onTagToggle(tag)} className="min-w-0 truncate">
+                        {tag}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => startEdit('tag', tag)}
+                        title="重命名"
+                        className="shrink-0 rounded opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
+                      >
+                        <Pencil size={11} />
+                      </button>
+                    </span>
+                  )
+                })}
               </div>
             </div>
           </>

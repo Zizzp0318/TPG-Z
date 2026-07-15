@@ -11,6 +11,8 @@ declare global {
       updateTags(id: string, tags: string[]): Promise<IpcResult>
       getFolders(): Promise<IpcResult<string[]>>
       getTags(): Promise<IpcResult<string[]>>
+      renameFolder(oldName: string, newName: string): Promise<IpcResult>
+      renameTag(oldName: string, newName: string): Promise<IpcResult>
       selectImages(): Promise<IpcResult<string[]>>
       selectFile(): Promise<IpcResult<string>>
       selectVideo(): Promise<IpcResult<string>>

@@ -253,6 +253,7 @@ function setImageTags(id: string, tags: string[]): void {
 
 export function dbUpdateTags(id: string, tags: string[]): void {
   setImageTags(id, tags)
+  pruneOrphanTags()
 }
 
 /** 编辑图片信息：标题/提示词/类型/文件夹/标签/参考图 */
@@ -314,6 +315,9 @@ export function dbDeleteImage(id: string): void {
   // 删数据库记录（image_tags、reference_images 由 ON DELETE CASCADE 自动清理）
   d.prepare(`DELETE FROM images WHERE id = ?`).run(id)
 
+  // 清理因这次删除而不再被任何图片引用的孤儿标签
+  pruneOrphanTags()
+
   // 删本地文件
   safeUnlink(join(dataDir, 'images', row.filename))
   safeUnlink(join(dataDir, 'thumbs', row.thumb_name))
@@ -339,8 +343,66 @@ export function dbGetFolders(): string[] {
 }
 
 export function dbGetTags(): string[] {
+  // 只返回仍被图片引用的标签：没有任何图片使用的标签不再显示，
+  // 与文件夹（从 images 表 DISTINCT 派生）行为保持一致。
   const rows = getDb()
-    .prepare(`SELECT name FROM tags ORDER BY name`)
+    .prepare(
+      `SELECT DISTINCT t.name FROM tags t
+       JOIN image_tags it ON t.id = it.tag_id
+       ORDER BY t.name`
+    )
     .all() as Array<{ name: string }>
   return rows.map((r) => r.name)
+}
+
+/** 清理孤儿标签：删除 tags 表中不再被任何图片引用的行 */
+function pruneOrphanTags(): void {
+  getDb()
+    .prepare(`DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM image_tags)`)
+    .run()
+}
+
+/**
+ * 重命名文件夹：把所有属于旧文件夹的图片改到新文件夹。
+ * 若新名称已存在，等价于把两个文件夹合并（图片归入同名文件夹）。
+ */
+export function dbRenameFolder(oldName: string, newName: string): void {
+  const from = oldName.trim()
+  const to = newName.trim()
+  if (!from || !to || from === to) return
+  getDb().prepare(`UPDATE images SET folder = ? WHERE folder = ?`).run(to, from)
+}
+
+/**
+ * 重命名标签：改 tags.name。
+ * 若新名称已存在（UNIQUE 冲突），则合并两个标签——把旧标签的图片关联转到
+ * 已有标签上，再删除旧标签。
+ */
+export function dbRenameTag(oldName: string, newName: string): void {
+  const d = getDb()
+  const from = oldName.trim()
+  const to = newName.trim()
+  if (!from || !to || from === to) return
+
+  const oldTag = d.prepare(`SELECT id FROM tags WHERE name = ?`).get(from) as
+    | { id: number }
+    | undefined
+  if (!oldTag) return
+
+  const existing = d.prepare(`SELECT id FROM tags WHERE name = ?`).get(to) as
+    | { id: number }
+    | undefined
+
+  if (!existing) {
+    // 目标名未占用：直接改名
+    d.prepare(`UPDATE tags SET name = ? WHERE id = ?`).run(to, oldTag.id)
+    return
+  }
+
+  // 目标名已存在：合并。把旧标签的关联转到已有标签（忽略重复），再删旧标签
+  d.prepare(
+    `UPDATE OR IGNORE image_tags SET tag_id = ? WHERE tag_id = ?`
+  ).run(existing.id, oldTag.id)
+  d.prepare(`DELETE FROM image_tags WHERE tag_id = ?`).run(oldTag.id)
+  d.prepare(`DELETE FROM tags WHERE id = ?`).run(oldTag.id)
 }

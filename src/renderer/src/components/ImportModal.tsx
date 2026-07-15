@@ -238,17 +238,11 @@ export function ImportModal({
               <label className="mb-1.5 block text-xs font-medium text-neutral-500">文件夹</label>
               <input
                 type="text"
-                list="import-folder-options"
                 value={folder}
                 onChange={(e) => setFolder(e.target.value)}
                 placeholder="选择已有文件夹，或输入新名称"
                 className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-indigo-500"
               />
-              <datalist id="import-folder-options">
-                {existingFolders.map((f) => (
-                  <option key={f} value={f} />
-                ))}
-              </datalist>
               {existingFolders.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {existingFolders.map((f) => (

@@ -11,6 +11,8 @@ import {
   dbUpdateTags,
   dbGetFolders,
   dbGetTags,
+  dbRenameFolder,
+  dbRenameTag,
   getDataDir
 } from './db'
 import { cpSync } from 'fs'
@@ -121,6 +123,25 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('meta:getTags', (): IpcResult<string[]> => {
     try {
       return { ok: true, data: dbGetTags() }
+    } catch (e) {
+      return { ok: false, error: String(e) }
+    }
+  })
+
+  // ---------- 重命名文件夹 / 标签 ----------
+  ipcMain.handle('meta:renameFolder', (_e, oldName: string, newName: string): IpcResult => {
+    try {
+      dbRenameFolder(oldName, newName)
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: String(e) }
+    }
+  })
+
+  ipcMain.handle('meta:renameTag', (_e, oldName: string, newName: string): IpcResult => {
+    try {
+      dbRenameTag(oldName, newName)
+      return { ok: true }
     } catch (e) {
       return { ok: false, error: String(e) }
     }

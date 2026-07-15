@@ -22,6 +22,3 @@ export interface GeneratedImage {
   folder: string // 所属文件夹 / 相册
   createdAt: string // ISO 日期字符串
 }
-
-// 视图布局模式
-export type ViewMode = 'masonry' | 'grid'

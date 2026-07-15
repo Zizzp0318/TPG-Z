@@ -35,6 +35,14 @@ const api = {
   getTags: (): Promise<IpcResult<string[]>> =>
     ipcRenderer.invoke('meta:getTags'),
 
+  /** 重命名文件夹 */
+  renameFolder: (oldName: string, newName: string): Promise<IpcResult> =>
+    ipcRenderer.invoke('meta:renameFolder', oldName, newName),
+
+  /** 重命名标签 */
+  renameTag: (oldName: string, newName: string): Promise<IpcResult> =>
+    ipcRenderer.invoke('meta:renameTag', oldName, newName),
+
   /** 打开文件选择对话框（多选） */
   selectImages: (): Promise<IpcResult<string[]>> =>
     ipcRenderer.invoke('dialog:selectImages'),

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
-import { Search, LayoutGrid, Columns, Plus, SlidersHorizontal, Image as ImageIcon } from 'lucide-react'
+import { Search, Plus, SlidersHorizontal, Image as ImageIcon } from 'lucide-react'
 import { Sidebar } from './components/Sidebar'
 import { MasonryGrid } from './components/MasonryGrid'
 import { DetailView } from './components/DetailView'
@@ -7,7 +7,7 @@ import { ImportModal } from './components/ImportModal'
 import { EditModal } from './components/EditModal'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import type { ImageRecord } from '../../shared/api'
-import { GeneratedImage, ViewMode } from './types'
+import { GeneratedImage } from './types'
 
 type FilterType = 'all' | 'text2img' | 'img2img' | 'text2video' | 'ref2video'
 
@@ -38,7 +38,6 @@ export default function App(): React.JSX.Element {
   const [allTags, setAllTags] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [viewMode, setViewMode] = useState<ViewMode>('masonry')
   const [search, setSearch] = useState('')
   const [selectedFolder, setSelectedFolder] = useState('全部')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
@@ -83,12 +82,37 @@ export default function App(): React.JSX.Element {
     )
   }, [])
 
+  // 重命名文件夹：成功后修正选中态并刷新
+  const renameFolder = useCallback(async (oldName: string, newName: string) => {
+    const to = newName.trim()
+    if (!to || to === oldName) return
+    const res = await window.api.renameFolder(oldName, to)
+    if (!res.ok) return
+    setSelectedFolder((cur) => (cur === oldName ? to : cur))
+    await loadData()
+  }, [loadData])
+
+  // 重命名标签：成功后修正已选标签并刷新
+  const renameTag = useCallback(async (oldName: string, newName: string) => {
+    const to = newName.trim()
+    if (!to || to === oldName) return
+    const res = await window.api.renameTag(oldName, to)
+    if (!res.ok) return
+    setSelectedTags((prev) => {
+      // 改名后若与已有标签合并，去重
+      const mapped = prev.map((t) => (t === oldName ? to : t))
+      return Array.from(new Set(mapped))
+    })
+    await loadData()
+  }, [loadData])
+
   // 筛选逻辑
   const filteredImages = useMemo(() => {
     return images.filter((img) => {
       if (selectedFolder !== '全部' && img.folder !== selectedFolder) return false
       if (typeFilter !== 'all' && img.type !== typeFilter) return false
-      if (selectedTags.length > 0 && !selectedTags.every((t) => img.tags.includes(t))) return false
+      // 多标签取并集：含任意一个选中标签即显示
+      if (selectedTags.length > 0 && !selectedTags.some((t) => img.tags.includes(t))) return false
       if (search.trim()) {
         const q = search.toLowerCase()
         const hit =
@@ -204,24 +228,6 @@ export default function App(): React.JSX.Element {
           />
         </div>
 
-        {/* 视图模式 */}
-        <div className="flex gap-0.5 rounded-md bg-neutral-800 p-0.5">
-          <button
-            onClick={() => setViewMode('masonry')}
-            className={`rounded p-1.5 ${viewMode === 'masonry' ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-white'}`}
-            title="瀑布流"
-          >
-            <Columns size={14} />
-          </button>
-          <button
-            onClick={() => setViewMode('grid')}
-            className={`rounded p-1.5 ${viewMode === 'grid' ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-white'}`}
-            title="网格"
-          >
-            <LayoutGrid size={14} />
-          </button>
-        </div>
-
         {/* 导入按钮 */}
         <button
           onClick={() => setShowImport(true)}
@@ -241,6 +247,8 @@ export default function App(): React.JSX.Element {
           onTagToggle={toggleTag}
           folders={folders}
           tags={allTags}
+          onRenameFolder={renameFolder}
+          onRenameTag={renameTag}
         />
 
         <main className="flex-1 overflow-auto p-5">
@@ -259,7 +267,7 @@ export default function App(): React.JSX.Element {
                   )}
                 </p>
               </div>
-              <MasonryGrid images={filteredImages} onSelect={openImage} viewMode={viewMode} columns={4} />
+              <MasonryGrid images={filteredImages} onSelect={openImage} columns={4} />
             </>
           )}
         </main>

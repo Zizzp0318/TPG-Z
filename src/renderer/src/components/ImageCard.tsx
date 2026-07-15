@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { GeneratedImage } from '../types'
 import { StarRating } from './StarRating'
-import { Images, Film, Play } from 'lucide-react'
+import { Images, Film, Play, Type } from 'lucide-react'
 
 interface ImageCardProps {
   image: GeneratedImage
@@ -10,6 +10,7 @@ interface ImageCardProps {
 
 // 类型徽标配置
 const TYPE_BADGE: Partial<Record<GeneratedImage['type'], { label: string; icon: ReactNode }>> = {
+  text2img:  { label: '文生图',   icon: <Type size={10} /> },
   img2img:   { label: '图生图',   icon: <Images size={10} /> },
   text2video: { label: '文生视频', icon: <Film size={10} /> },
   ref2video:  { label: '参考生视频', icon: <Film size={10} /> },
