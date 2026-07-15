@@ -115,12 +115,10 @@ export function ImportModal({
 
         <div className="flex flex-1 overflow-hidden">
           {/* 左：图片选择 */}
-          <div className="flex w-96 shrink-0 flex-col border-r border-neutral-800 p-4 gap-4">
+          <div className="flex w-96 shrink-0 flex-col overflow-y-auto border-r border-neutral-800 p-4 gap-4">
             {/* 主文件（图片 or 视频） */}
-            <div>
-              <p className="mb-2 text-xs font-medium text-neutral-500">
-                {isVideoType ? '生成结果视频' : '生成结果图片'}
-              </p>
+            <div className="shrink-0">
+              <p className="mb-2 text-xs font-medium text-neutral-500">导入素材</p>
               {srcPath ? (
                 <div className="relative">
                   {isVideoPath(srcPath) ? (
@@ -159,7 +157,7 @@ export function ImportModal({
 
             {/* 参考图（图生图 / 参考生视频模式） */}
             {hasRefs && (
-              <div className="flex-1">
+              <div className="shrink-0">
                 <p className="mb-2 text-xs font-medium text-neutral-500">上传参考素材（图片或视频，可多张）</p>
                 <div className="flex flex-wrap gap-2">
                   {refs.map((ref, i) => (

@@ -258,7 +258,7 @@ export default function App(): React.JSX.Element {
             <>
               <div className="mb-4 flex items-center justify-between">
                 <p className="text-xs text-neutral-500">
-                  共 {filteredImages.length} 张图片
+                  共 {filteredImages.length} 个作品
                   {selectedTags.length > 0 && (
                     <span>
                       {' '}· 标签：{selectedTags.map((t) => <span key={t} className="text-indigo-400">{t} </span>)}
