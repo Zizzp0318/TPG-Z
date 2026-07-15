@@ -3,9 +3,9 @@
  * Electron 43 内置 Node 22+，node:sqlite 已稳定可用
  */
 import { DatabaseSync } from 'node:sqlite'
-import { join } from 'path'
+import { join, dirname } from 'path'
 import { app } from 'electron'
-import { mkdirSync, copyFileSync, existsSync, rmSync, cpSync } from 'fs'
+import { mkdirSync, copyFileSync, existsSync, rmSync, cpSync, accessSync, constants } from 'fs'
 import { randomUUID } from 'crypto'
 import { nativeImage } from 'electron'
 import { writeFileSync } from 'fs'
@@ -19,13 +19,30 @@ export function getDataDir(): string {
   return dataDir
 }
 
+/** 检测目录是否可写：目录不存在则尝试创建，再用 accessSync 验证写权限 */
+function isWritable(dir: string): boolean {
+  try {
+    mkdirSync(dir, { recursive: true })
+    accessSync(dir, constants.W_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /**
  * 解析数据目录：
  * - 开发模式：项目根目录下的 data/（跟随项目，不进 C 盘用户目录）
- * - 打包后：仍用系统 userData/tpg-z，保证正常安装使用时可写
+ * - 打包后（便携模式）：exe 所在目录下的 data/，数据跟软件走，整体可搬移。
+ *   若该目录不可写（如装在 Program Files 需管理员权限），回退到系统 userData/tpg-z，
+ *   保证导入功能不因无写权限而失败。
  */
 function resolveDataDir(): string {
   if (app.isPackaged) {
+    // app.getPath('exe') 是主程序 exe 的完整路径，其所在目录即安装目录
+    const portableDir = join(dirname(app.getPath('exe')), 'data')
+    if (isWritable(portableDir)) return portableDir
+    console.warn(`[db] 安装目录不可写，回退到 userData: ${portableDir}`)
     return join(app.getPath('userData'), 'tpg-z')
   }
   // 开发模式：process.cwd() 即运行 npm run dev 的项目根目录
