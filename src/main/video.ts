@@ -34,8 +34,24 @@ let cachedFfmpeg: string | null = null
 function ffmpegBin(): string {
   if (cachedFfmpeg) return cachedFfmpeg
   let p = (ffmpegStatic as unknown as string) || ''
+  // ffmpeg-static 返回的路径基于其模块的 __dirname 计算；打包后二进制被
+  // asarUnpack 解压，需把 app.asar 修正为 app.asar.unpacked。
   if (p && app.isPackaged) {
     p = p.replace('app.asar', 'app.asar.unpacked')
+  }
+  // 兜底：打包时若 ffmpeg-static 被内联进主进程 bundle，其 __dirname 会指向
+  // out/main 而非 node_modules，导致上面算出的路径不存在。此时直接按解压后的
+  // 固定位置定位真实二进制（resources/app.asar.unpacked/node_modules/ffmpeg-static）。
+  if (app.isPackaged && (!p || !existsSync(p))) {
+    const exe = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+    const guess = join(
+      process.resourcesPath,
+      'app.asar.unpacked',
+      'node_modules',
+      'ffmpeg-static',
+      exe
+    )
+    if (existsSync(guess)) p = guess
   }
   cachedFfmpeg = p && existsSync(p) ? p : 'ffmpeg'
   console.log(`[video] 使用 ffmpeg: ${cachedFfmpeg}`)

@@ -7,8 +7,10 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     build: {
       rollupOptions: {
-        // 显式把 electron 标记为外部依赖，不打包进主进程 bundle
-        external: ['electron'],
+        // 显式把 electron 标记为外部依赖，不打包进主进程 bundle。
+        // ffmpeg-static 也必须外部化：它靠 __dirname 定位二进制，一旦被内联进
+        // bundle，__dirname 会指向 out/main 而非 node_modules，导致找不到 ffmpeg.exe。
+        external: ['electron', 'ffmpeg-static'],
         input: {
           index: resolve(__dirname, 'src/main/index.ts')
         }
