@@ -92,7 +92,7 @@ export function EditModal({
       <div className="flex h-[90vh] w-[720px] max-w-[95vw] flex-col rounded-xl border border-neutral-700 bg-neutral-900 shadow-2xl">
         {/* 标题栏 */}
         <div className="flex items-center justify-between border-b border-neutral-800 px-5 py-4">
-          <h2 className="text-sm font-semibold text-neutral-100">编辑图片信息</h2>
+          <h2 className="text-sm font-semibold text-neutral-100">编辑作品</h2>
           <button onClick={onClose} className="rounded p-1 text-neutral-400 hover:bg-neutral-800 hover:text-white">
             <X size={16} />
           </button>

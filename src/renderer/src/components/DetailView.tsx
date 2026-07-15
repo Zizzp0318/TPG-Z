@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Copy, Check, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { GeneratedImage } from '../types'
 import { StarRating } from './StarRating'
-import { isVideoType } from '../../../shared/media'
+import { isVideoType, isVideoPath } from '../../../shared/media'
 
 // 生成方式徽标文案
 const TYPE_LABEL: Record<GeneratedImage['type'], string> = {
@@ -147,11 +147,22 @@ export function DetailView({
             top: Math.max(8, Math.min(hoveredRef.rect.top, window.innerHeight - 320))
           }}
         >
-          <img
-            src={hoveredRef.url}
-            alt="参考图预览"
-            className="block max-h-[300px] max-w-[300px] object-contain"
-          />
+          {isVideoPath(hoveredRef.url) ? (
+            <video
+              src={hoveredRef.url}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="block max-h-[300px] max-w-[300px] object-contain"
+            />
+          ) : (
+            <img
+              src={hoveredRef.url}
+              alt="参考图预览"
+              className="block max-h-[300px] max-w-[300px] object-contain"
+            />
+          )}
         </div>
       )}
 
@@ -284,18 +295,38 @@ export function DetailView({
                 参考图
               </div>
               <div className="flex flex-wrap gap-2">
-                {image.referenceImages.map((ref) => (
-                  <img
-                    key={ref.id}
-                    src={ref.thumb}
-                    alt="参考图"
-                    onMouseEnter={(e) =>
-                      setHoveredRef({ url: ref.full, rect: e.currentTarget.getBoundingClientRect() })
-                    }
-                    onMouseLeave={() => setHoveredRef(null)}
-                    className="h-16 w-16 cursor-pointer rounded-md object-cover ring-1 ring-neutral-700 transition hover:ring-indigo-500"
-                  />
-                ))}
+                {image.referenceImages.map((ref) =>
+                  isVideoPath(ref.full) ? (
+                    <video
+                      key={ref.id}
+                      src={ref.full}
+                      muted
+                      loop
+                      playsInline
+                      preload="metadata"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.play().catch(() => {})
+                        setHoveredRef({ url: ref.full, rect: e.currentTarget.getBoundingClientRect() })
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.pause()
+                        setHoveredRef(null)
+                      }}
+                      className="h-16 w-16 cursor-pointer rounded-md object-cover ring-1 ring-neutral-700 transition hover:ring-indigo-500 bg-black"
+                    />
+                  ) : (
+                    <img
+                      key={ref.id}
+                      src={ref.thumb}
+                      alt="参考图"
+                      onMouseEnter={(e) =>
+                        setHoveredRef({ url: ref.full, rect: e.currentTarget.getBoundingClientRect() })
+                      }
+                      onMouseLeave={() => setHoveredRef(null)}
+                      className="h-16 w-16 cursor-pointer rounded-md object-cover ring-1 ring-neutral-700 transition hover:ring-indigo-500"
+                    />
+                  )
+                )}
               </div>
             </div>
           )}

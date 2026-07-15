@@ -1,11 +1,9 @@
 /**
- * 视频转 GIF — 调用内置 ffmpeg（ffmpeg-static，随软件分发，用户无需自行安装）
- * 参数：16fps，最长边缩到 480，用两遍调色板法保证质量
+ * 视频处理 — 调用内置 ffmpeg（ffmpeg-static，随软件分发，用户无需自行安装）
+ * 目前仅用于抽取视频首帧作为缩略图；参考视频原样存储、显示层用 <video> 播放。
  */
 import { spawn } from 'child_process'
 import { join } from 'path'
-import { tmpdir } from 'os'
-import { randomUUID } from 'crypto'
 import { existsSync, rmSync } from 'fs'
 import { app } from 'electron'
 import ffmpegStatic from 'ffmpeg-static'
@@ -78,53 +76,6 @@ function runFfmpeg(args: string[]): Promise<void> {
 }
 
 /**
- * 把视频转成 GIF。
- * @param srcPath 源视频绝对路径
- * @param destPath 输出 GIF 绝对路径
- * @param fps 帧率，默认 16
- * @param maxEdge 最长边像素，默认 480
- */
-export async function convertVideoToGif(
-  srcPath: string,
-  destPath: string,
-  fps = 16,
-  maxEdge = 480
-): Promise<void> {
-  // 缩放滤镜：最长边限制到 maxEdge，保持比例，宽高取偶数（GIF 要求）
-  // if(gt(a,1),...) 按宽高比判断横竖，长边设为 maxEdge，短边按比例(-2 保证偶数)
-  const scale = `scale=w='if(gt(a,1),${maxEdge},-2)':h='if(gt(a,1),-2,${maxEdge})':flags=lanczos`
-
-  const palette = join(tmpdir(), `tpgz-palette-${randomUUID()}.png`)
-  try {
-    // 第一遍：生成优化调色板
-    await runFfmpeg([
-      '-y',
-      '-i', srcPath,
-      '-vf', `fps=${fps},${scale},palettegen=stats_mode=diff`,
-      palette
-    ])
-
-    // 第二遍：用调色板合成 GIF
-    await runFfmpeg([
-      '-y',
-      '-i', srcPath,
-      '-i', palette,
-      '-lavfi', `fps=${fps},${scale} [x]; [x][1:v] paletteuse=dither=bayer:bayer_scale=3`,
-      destPath
-    ])
-  } finally {
-    // 清理临时调色板
-    if (existsSync(palette)) {
-      try {
-        rmSync(palette, { force: true })
-      } catch {
-        // 忽略
-      }
-    }
-  }
-}
-
-/**
  * 抽取视频首帧，保存为 JPEG（用作列表缩略图 / 导入预览）。
  * @param srcPath 源视频绝对路径
  * @param destPath 输出 JPEG 绝对路径
@@ -155,13 +106,9 @@ export async function preprocessRefPaths(paths: string[]): Promise<ProcessedRef[
   const results: ProcessedRef[] = []
   for (const p of paths) {
     if (!existsSync(p)) continue
-    if (isVideoFile(p)) {
-      const gifPath = join(tmpdir(), `tpgz-ref-${randomUUID()}.gif`)
-      await convertVideoToGif(p, gifPath)
-      results.push({ path: gifPath, isTemp: true })
-    } else {
-      results.push({ path: p, isTemp: false })
-    }
+    // 视频与图片都原样落地：视频保留原编码（体积远小于 GIF），
+    // 显示层用 <video> 播放。存储层按原扩展名复制，无需转换。
+    results.push({ path: p, isTemp: false })
   }
   return results
 }
