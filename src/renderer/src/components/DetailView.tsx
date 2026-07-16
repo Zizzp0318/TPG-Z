@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Copy, Check, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react'
+import { X, Copy, Check, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, Pencil, Trash2, Download } from 'lucide-react'
 import { GeneratedImage } from '../types'
 import { StarRating } from './StarRating'
 import { isVideoType, isVideoPath } from '../../../shared/media'
@@ -75,7 +75,6 @@ export function DetailView({
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      // 降级:创建临时 textarea
       const ta = document.createElement('textarea')
       ta.value = image.prompt
       document.body.appendChild(ta)
@@ -86,6 +85,11 @@ export function DetailView({
       setTimeout(() => setCopied(false), 2000)
     }
   }, [image.prompt])
+
+  // 另存为：弹出系统保存对话框，把作品/参考素材复制到用户选定位置
+  const saveFile = useCallback(async (localUrl: string, defaultName: string) => {
+    await window.api.saveFileAs(localUrl, defaultName)
+  }, [])
 
   // 滚轮缩放
   const onWheel = useCallback((e: React.WheelEvent) => {
@@ -240,36 +244,16 @@ export function DetailView({
 
       {/* 右侧：信息面板 */}
       <div className="flex w-80 shrink-0 flex-col border-l border-neutral-800 bg-neutral-950">
-        {/* 标题栏 */}
+        {/* 标题栏：只保留关闭按钮 */}
         <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
           <h2 className="truncate text-sm font-semibold text-neutral-100">{image.title}</h2>
-          <div className="ml-2 flex shrink-0 items-center gap-0.5">
-            {onEdit && (
-              <button
-                onClick={onEdit}
-                className="rounded p-1.5 text-neutral-400 hover:bg-neutral-800 hover:text-white"
-                title="编辑"
-              >
-                <Pencil size={15} />
-              </button>
-            )}
-            {onDelete && (
-              <button
-                onClick={onDelete}
-                className="rounded p-1.5 text-neutral-400 hover:bg-red-900/40 hover:text-red-400"
-                title="删除"
-              >
-                <Trash2 size={15} />
-              </button>
-            )}
-            <button
-              onClick={onClose}
-              className="rounded p-1.5 text-neutral-400 hover:bg-neutral-800 hover:text-white"
-              title="关闭"
-            >
-              <X size={16} />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="ml-2 shrink-0 rounded p-1.5 text-neutral-400 hover:bg-neutral-800 hover:text-white"
+            title="关闭"
+          >
+            <X size={16} />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5 text-sm">
@@ -297,34 +281,50 @@ export function DetailView({
               <div className="flex flex-wrap gap-2">
                 {image.referenceImages.map((ref) =>
                   isVideoPath(ref.full) ? (
-                    <video
-                      key={ref.id}
-                      src={ref.full}
-                      muted
-                      loop
-                      playsInline
-                      preload="metadata"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.play().catch(() => {})
-                        setHoveredRef({ url: ref.full, rect: e.currentTarget.getBoundingClientRect() })
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.pause()
-                        setHoveredRef(null)
-                      }}
-                      className="h-16 w-16 cursor-pointer rounded-md object-cover ring-1 ring-neutral-700 transition hover:ring-indigo-500 bg-black"
-                    />
+                    <div key={ref.id} className="group relative">
+                      <video
+                        src={ref.full}
+                        muted
+                        loop
+                        playsInline
+                        preload="metadata"
+                        onMouseEnter={(e) => {
+                          e.currentTarget.play().catch(() => {})
+                          setHoveredRef({ url: ref.full, rect: e.currentTarget.getBoundingClientRect() })
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.pause()
+                          setHoveredRef(null)
+                        }}
+                        className="h-16 w-16 cursor-pointer rounded-md object-cover ring-1 ring-neutral-700 transition hover:ring-indigo-500 bg-black"
+                      />
+                      <button
+                        onClick={() => saveFile(ref.full, `参考素材`)}
+                        title="另存为"
+                        className="absolute bottom-0.5 right-0.5 rounded bg-black/70 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/90"
+                      >
+                        <Download size={11} />
+                      </button>
+                    </div>
                   ) : (
-                    <img
-                      key={ref.id}
-                      src={ref.thumb}
-                      alt="参考图"
-                      onMouseEnter={(e) =>
-                        setHoveredRef({ url: ref.full, rect: e.currentTarget.getBoundingClientRect() })
-                      }
-                      onMouseLeave={() => setHoveredRef(null)}
-                      className="h-16 w-16 cursor-pointer rounded-md object-cover ring-1 ring-neutral-700 transition hover:ring-indigo-500"
-                    />
+                    <div key={ref.id} className="group relative">
+                      <img
+                        src={ref.thumb}
+                        alt="参考图"
+                        onMouseEnter={(e) =>
+                          setHoveredRef({ url: ref.full, rect: e.currentTarget.getBoundingClientRect() })
+                        }
+                        onMouseLeave={() => setHoveredRef(null)}
+                        className="h-16 w-16 cursor-pointer rounded-md object-cover ring-1 ring-neutral-700 transition hover:ring-indigo-500"
+                      />
+                      <button
+                        onClick={() => saveFile(ref.full, `参考素材`)}
+                        title="另存为"
+                        className="absolute bottom-0.5 right-0.5 rounded bg-black/70 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/90"
+                      >
+                        <Download size={11} />
+                      </button>
+                    </div>
                   )
                 )}
               </div>
@@ -396,6 +396,35 @@ export function DetailView({
               <span className="text-neutral-400">{dateStr}</span>
             </div>
           </div>
+        </div>
+
+        {/* 底部操作区：编辑 / 另存为 / 删除 */}
+        <div className="shrink-0 border-t border-neutral-800 px-4 py-3 flex items-center gap-2">
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs text-neutral-300 hover:bg-neutral-800 hover:text-white transition-colors"
+            >
+              <Pencil size={13} />
+              编辑
+            </button>
+          )}
+          <button
+            onClick={() => saveFile(image.full, image.title)}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs text-neutral-300 hover:bg-neutral-800 hover:text-white transition-colors"
+          >
+            <Download size={13} />
+            另存为
+          </button>
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs text-red-500 hover:bg-red-900/30 hover:text-red-400 transition-colors"
+            >
+              <Trash2 size={13} />
+              删除
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -15,13 +15,14 @@ import {
   dbRenameTag,
   getDataDir
 } from './db'
-import { cpSync } from 'fs'
+import { cpSync, copyFileSync } from 'fs'
 import { preprocessRefPaths, cleanupTemp, isVideoFile, extractFirstFrame } from './video'
-import { join } from 'path'
+import { join, extname } from 'path'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
 import { existsSync, rmSync } from 'fs'
 import type { ImportPayload, UpdatePayload, IpcResult, ImageRecord } from '../shared/api'
+import { parseLocalUrl } from '../shared/url'
 
 export function registerIpcHandlers(): void {
   // ---------- 图片列表 ----------
@@ -234,6 +235,28 @@ export function registerIpcHandlers(): void {
 
       cpSync(getDataDir(), destDir, { recursive: true })
       return { ok: true, data: destDir }
+    } catch (e) {
+      return { ok: false, error: String(e) }
+    }
+  })
+
+  // ---------- 文件另存为 ----------
+  ipcMain.handle('files:saveAs', async (_e, localUrl: string, defaultName: string): Promise<IpcResult> => {
+    try {
+      const srcPath = parseLocalUrl(localUrl)
+      if (!srcPath || !existsSync(srcPath)) return { ok: false, error: '源文件不存在' }
+      const ext = extname(srcPath).toLowerCase()
+      const isVideo = ['.mp4', '.mov', '.webm', '.avi', '.mkv', '.m4v', '.flv', '.wmv'].includes(ext)
+      const result = await dialog.showSaveDialog({
+        title: '另存为',
+        defaultPath: defaultName.endsWith(ext) ? defaultName : `${defaultName}${ext}`,
+        filters: isVideo
+          ? [{ name: '视频', extensions: [ext.slice(1)] }, { name: '所有文件', extensions: ['*'] }]
+          : [{ name: '图片', extensions: [ext.slice(1)] }, { name: '所有文件', extensions: ['*'] }]
+      })
+      if (result.canceled || !result.filePath) return { ok: true }
+      copyFileSync(srcPath, result.filePath)
+      return { ok: true }
     } catch (e) {
       return { ok: false, error: String(e) }
     }

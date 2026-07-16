@@ -55,7 +55,9 @@ const api = {
   selectVideo: (): Promise<IpcResult<string>> =>
     ipcRenderer.invoke('dialog:selectVideo'),
 
-  /** 用系统文件管理器打开数据目录 */
+  /** 文件另存为：弹出保存对话框，把 local:// 指向的文件复制到用户选定位置 */
+  saveFileAs: (localUrl: string, defaultName: string): Promise<IpcResult> =>
+    ipcRenderer.invoke('files:saveAs', localUrl, defaultName),
   openDataDir: (): Promise<IpcResult> =>
     ipcRenderer.invoke('data:openDir'),
 
