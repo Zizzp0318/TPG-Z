@@ -17,6 +17,7 @@
   "build": {
     "appId": "com.tpgz.app",
     "productName": "TPG-Z",
+    "icon": "build/icon.png",
     "directories": {
       "output": "release"
     },

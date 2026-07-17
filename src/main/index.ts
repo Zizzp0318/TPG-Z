@@ -47,8 +47,10 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     autoHideMenuBar: true,
-    title: 'TPG-Z 图片管理',
+    title: 'AI 作品管理',
     backgroundColor: '#0f1115',
+    // 开发模式下显示自定义图标；打包后 exe 已内嵌图标，无需额外设置
+    ...(app.isPackaged ? {} : { icon: join(__dirname, '../../build/icon.png') }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       sandbox: false
