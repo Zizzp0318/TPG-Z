@@ -13,6 +13,8 @@ declare global {
       getTags(): Promise<IpcResult<string[]>>
       renameFolder(oldName: string, newName: string): Promise<IpcResult>
       renameTag(oldName: string, newName: string): Promise<IpcResult>
+      reorderFolders(order: string[]): Promise<IpcResult>
+      reorderTags(order: string[]): Promise<IpcResult>
       saveFileAs(localUrl: string, defaultName: string): Promise<IpcResult>
       selectImages(): Promise<IpcResult<string[]>>
       selectFile(): Promise<IpcResult<string>>

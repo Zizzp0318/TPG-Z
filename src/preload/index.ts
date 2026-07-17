@@ -43,6 +43,14 @@ const api = {
   renameTag: (oldName: string, newName: string): Promise<IpcResult> =>
     ipcRenderer.invoke('meta:renameTag', oldName, newName),
 
+  /** 保存文件夹自定义顺序 */
+  reorderFolders: (order: string[]): Promise<IpcResult> =>
+    ipcRenderer.invoke('meta:reorderFolders', order),
+
+  /** 保存标签自定义顺序 */
+  reorderTags: (order: string[]): Promise<IpcResult> =>
+    ipcRenderer.invoke('meta:reorderTags', order),
+
   /** 打开文件选择对话框（多选） */
   selectImages: (): Promise<IpcResult<string[]>> =>
     ipcRenderer.invoke('dialog:selectImages'),

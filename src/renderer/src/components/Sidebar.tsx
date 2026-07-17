@@ -14,6 +14,21 @@ interface SidebarProps {
   onRenameFolder: (oldName: string, newName: string) => void
   /** 重命名标签 */
   onRenameTag: (oldName: string, newName: string) => void
+  /** 保存文件夹新顺序（不含"全部"） */
+  onReorderFolders: (order: string[]) => void
+  /** 保存标签新顺序 */
+  onReorderTags: (order: string[]) => void
+}
+
+/** 把 list 中的 from 项移动到 to 项的位置，返回新数组 */
+function reorderList(list: string[], from: string, to: string): string[] {
+  const arr = [...list]
+  const fromIdx = arr.indexOf(from)
+  const toIdx = arr.indexOf(to)
+  if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return arr
+  arr.splice(fromIdx, 1)
+  arr.splice(toIdx, 0, from)
+  return arr
 }
 
 export function Sidebar({
@@ -24,7 +39,9 @@ export function Sidebar({
   folders,
   tags,
   onRenameFolder,
-  onRenameTag
+  onRenameTag,
+  onReorderFolders,
+  onReorderTags
 }: SidebarProps) {
   const [backingUp, setBackingUp] = useState(false)
   // 底部操作提示：成功/失败短暂显示
@@ -32,6 +49,27 @@ export function Sidebar({
   // 正在重命名的项：kind 区分文件夹/标签，name 为原名；draft 为输入框草稿
   const [editing, setEditing] = useState<{ kind: 'folder' | 'tag'; name: string } | null>(null)
   const [draft, setDraft] = useState('')
+  // 拖拽排序：正在拖动的项 / 拖到其上方的目标项
+  const [dragItem, setDragItem] = useState<{ kind: 'folder' | 'tag'; name: string } | null>(null)
+  const [dragOver, setDragOver] = useState<{ kind: 'folder' | 'tag'; name: string } | null>(null)
+
+  // 拖放到目标项：把拖动项移到目标位置并持久化
+  const handleDrop = (kind: 'folder' | 'tag', target: string): void => {
+    if (!dragItem || dragItem.kind !== kind || dragItem.name === target) {
+      setDragItem(null)
+      setDragOver(null)
+      return
+    }
+    if (kind === 'folder') {
+      // 文件夹排序不含"全部"（它固定在顶部）
+      const list = folders.filter((f) => f !== '全部')
+      onReorderFolders(reorderList(list, dragItem.name, target))
+    } else {
+      onReorderTags(reorderList(tags, dragItem.name, target))
+    }
+    setDragItem(null)
+    setDragOver(null)
+  }
 
   const startEdit = (kind: 'folder' | 'tag', name: string): void => {
     setEditing({ kind, name })
@@ -114,12 +152,36 @@ export function Sidebar({
                   </div>
                 )
               }
+              const draggable = f !== '全部'
+              const isDragOver = dragOver?.kind === 'folder' && dragOver.name === f && dragItem?.name !== f
               return (
-                <div key={f} className="group flex items-center">
+                <div
+                  key={f}
+                  draggable={draggable}
+                  onDragStart={draggable ? () => setDragItem({ kind: 'folder', name: f }) : undefined}
+                  onDragOver={
+                    draggable
+                      ? (e) => {
+                          e.preventDefault()
+                          if (dragItem?.kind === 'folder') setDragOver({ kind: 'folder', name: f })
+                        }
+                      : undefined
+                  }
+                  onDrop={draggable ? () => handleDrop('folder', f) : undefined}
+                  onDragEnd={() => {
+                    setDragItem(null)
+                    setDragOver(null)
+                  }}
+                  className={`group flex items-center rounded-md ${
+                    isDragOver ? 'ring-1 ring-indigo-500' : ''
+                  } ${dragItem?.name === f ? 'opacity-40' : ''}`}
+                >
                   <button
                     type="button"
                     onClick={() => onFolderChange(f)}
                     className={`min-w-0 flex-1 truncate rounded-md px-3 py-1.5 text-left transition-colors ${
+                      draggable ? 'cursor-grab active:cursor-grabbing' : ''
+                    } ${
                       selectedFolder === f
                         ? 'bg-indigo-600/30 text-indigo-300'
                         : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'
@@ -180,10 +242,25 @@ export function Sidebar({
                       </div>
                     )
                   }
+                  const isTagDragOver =
+                    dragOver?.kind === 'tag' && dragOver.name === tag && dragItem?.name !== tag
                   return (
                     <span
                       key={tag}
-                      className={`group inline-flex items-center gap-1 rounded-full pl-2.5 pr-1.5 py-0.5 text-xs transition-colors ${
+                      draggable
+                      onDragStart={() => setDragItem({ kind: 'tag', name: tag })}
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        if (dragItem?.kind === 'tag') setDragOver({ kind: 'tag', name: tag })
+                      }}
+                      onDrop={() => handleDrop('tag', tag)}
+                      onDragEnd={() => {
+                        setDragItem(null)
+                        setDragOver(null)
+                      }}
+                      className={`group inline-flex cursor-grab items-center gap-1 rounded-full pl-2.5 pr-1.5 py-0.5 text-xs transition-colors active:cursor-grabbing ${
+                        isTagDragOver ? 'ring-1 ring-indigo-400' : ''
+                      } ${dragItem?.name === tag ? 'opacity-40' : ''} ${
                         selectedTags.includes(tag)
                           ? 'bg-indigo-600 text-white'
                           : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200'

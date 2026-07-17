@@ -119,6 +119,11 @@ export function initDb(): void {
       FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE,
       FOREIGN KEY (tag_id)   REFERENCES tags(id)   ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `)
 }
 
@@ -335,11 +340,53 @@ function safeUnlink(filePath: string): void {
   }
 }
 
+/** 读取键值设置，不存在返回空串 */
+function getSetting(key: string): string {
+  const row = getDb()
+    .prepare(`SELECT value FROM app_settings WHERE key = ?`)
+    .get(key) as { value: string } | undefined
+  return row?.value ?? ''
+}
+
+/** 写入键值设置（upsert） */
+function setSetting(key: string, value: string): void {
+  getDb()
+    .prepare(
+      `INSERT INTO app_settings (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    )
+    .run(key, value)
+}
+
+/** 从设置里读出保存的顺序数组（JSON），解析失败返回空数组 */
+function readOrder(key: string): string[] {
+  const raw = getSetting(key)
+  if (!raw) return []
+  try {
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? (arr as string[]) : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * 按保存的顺序重排 items：先按 order 里出现的顺序，
+ * 不在 order 里的新项（order 之后新增的）按字母序追加到末尾。
+ */
+function applyOrder(items: string[], order: string[]): string[] {
+  const set = new Set(items)
+  const ordered = order.filter((x) => set.has(x))
+  const seen = new Set(ordered)
+  const rest = items.filter((x) => !seen.has(x)).sort((a, b) => a.localeCompare(b))
+  return [...ordered, ...rest]
+}
+
 export function dbGetFolders(): string[] {
   const rows = getDb()
     .prepare(`SELECT DISTINCT folder FROM images ORDER BY folder`)
     .all() as Array<{ folder: string }>
-  return rows.map((r) => r.folder)
+  return applyOrder(rows.map((r) => r.folder), readOrder('folder_order'))
 }
 
 export function dbGetTags(): string[] {
@@ -352,7 +399,17 @@ export function dbGetTags(): string[] {
        ORDER BY t.name`
     )
     .all() as Array<{ name: string }>
-  return rows.map((r) => r.name)
+  return applyOrder(rows.map((r) => r.name), readOrder('tag_order'))
+}
+
+/** 保存文件夹自定义顺序 */
+export function dbReorderFolders(order: string[]): void {
+  setSetting('folder_order', JSON.stringify(order))
+}
+
+/** 保存标签自定义顺序 */
+export function dbReorderTags(order: string[]): void {
+  setSetting('tag_order', JSON.stringify(order))
 }
 
 /** 清理孤儿标签：删除 tags 表中不再被任何图片引用的行 */
@@ -371,6 +428,23 @@ export function dbRenameFolder(oldName: string, newName: string): void {
   const to = newName.trim()
   if (!from || !to || from === to) return
   getDb().prepare(`UPDATE images SET folder = ? WHERE folder = ?`).run(to, from)
+  renameInOrder('folder_order', from, to)
+}
+
+/**
+ * 在保存的顺序数组里把旧名替换为新名，保留原位置。
+ * 若新名已存在（合并场景），删除旧名条目、保留新名原位。
+ */
+function renameInOrder(key: string, from: string, to: string): void {
+  const order = readOrder(key)
+  const idx = order.indexOf(from)
+  if (idx === -1) return
+  if (order.includes(to)) {
+    order.splice(idx, 1)
+  } else {
+    order[idx] = to
+  }
+  setSetting(key, JSON.stringify(order))
 }
 
 /**
@@ -396,6 +470,7 @@ export function dbRenameTag(oldName: string, newName: string): void {
   if (!existing) {
     // 目标名未占用：直接改名
     d.prepare(`UPDATE tags SET name = ? WHERE id = ?`).run(to, oldTag.id)
+    renameInOrder('tag_order', from, to)
     return
   }
 
@@ -405,4 +480,5 @@ export function dbRenameTag(oldName: string, newName: string): void {
   ).run(existing.id, oldTag.id)
   d.prepare(`DELETE FROM image_tags WHERE tag_id = ?`).run(oldTag.id)
   d.prepare(`DELETE FROM tags WHERE id = ?`).run(oldTag.id)
+  renameInOrder('tag_order', from, to)
 }

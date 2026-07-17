@@ -13,6 +13,8 @@ import {
   dbGetTags,
   dbRenameFolder,
   dbRenameTag,
+  dbReorderFolders,
+  dbReorderTags,
   getDataDir
 } from './db'
 import { cpSync, copyFileSync } from 'fs'
@@ -142,6 +144,24 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('meta:renameTag', (_e, oldName: string, newName: string): IpcResult => {
     try {
       dbRenameTag(oldName, newName)
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: String(e) }
+    }
+  })
+
+  ipcMain.handle('meta:reorderFolders', (_e, order: string[]): IpcResult => {
+    try {
+      dbReorderFolders(order)
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: String(e) }
+    }
+  })
+
+  ipcMain.handle('meta:reorderTags', (_e, order: string[]): IpcResult => {
+    try {
+      dbReorderTags(order)
       return { ok: true }
     } catch (e) {
       return { ok: false, error: String(e) }

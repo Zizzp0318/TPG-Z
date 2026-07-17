@@ -107,6 +107,18 @@ export default function App(): React.JSX.Element {
     await loadData()
   }, [loadData])
 
+  // 保存文件夹新顺序：乐观更新（保留"全部"在首位）后持久化
+  const reorderFolders = useCallback(async (order: string[]) => {
+    setFolders(['全部', ...order])
+    await window.api.reorderFolders(order)
+  }, [])
+
+  // 保存标签新顺序：乐观更新后持久化
+  const reorderTags = useCallback(async (order: string[]) => {
+    setAllTags(order)
+    await window.api.reorderTags(order)
+  }, [])
+
   // 筛选逻辑
   const filteredImages = useMemo(() => {
     return images.filter((img) => {
@@ -250,6 +262,8 @@ export default function App(): React.JSX.Element {
           tags={allTags}
           onRenameFolder={renameFolder}
           onRenameTag={renameTag}
+          onReorderFolders={reorderFolders}
+          onReorderTags={reorderTags}
         />
 
         <main className="flex-1 overflow-auto p-5">
