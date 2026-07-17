@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
-import { Search, Plus, SlidersHorizontal, Image as ImageIcon } from 'lucide-react'
+import { Search, Plus, SlidersHorizontal } from 'lucide-react'
+import logoUrl from './assets/logo.png'
 import { Sidebar } from './components/Sidebar'
 import { MasonryGrid } from './components/MasonryGrid'
 import { DetailView } from './components/DetailView'
@@ -187,7 +188,7 @@ export default function App(): React.JSX.Element {
       {/* 顶部栏 */}
       <header className="flex h-14 shrink-0 items-center gap-3 border-b border-neutral-800 px-4">
         <div className="flex items-center gap-2 mr-2">
-          <ImageIcon size={20} className="text-indigo-400" />
+          <img src={logoUrl} alt="AI 作品管理" className="h-6 w-6 rounded object-contain" />
           <span className="text-sm font-semibold tracking-tight">AI 作品管理</span>
         </div>
 
